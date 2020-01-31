@@ -2,6 +2,74 @@ import benchmark
 import unittest
 
 
+class TestBenchmark(unittest.TestCase):
+    sample_bench_results = [
+        benchmark.BenchRes(
+            inputs=benchmark.BenchInputs(
+                subs=["first_bench"],
+                variables=[
+                    benchmark.BenchVarValue(var_name='first_var',
+                                            var_value='some_name'),
+                    benchmark.BenchVarValue(
+                        var_name='second_var', var_value=1),
+                    benchmark.BenchVarValue(
+                        var_name='third_var', var_value=1.00),
+                ]),
+            outputs=benchmark.BenchOutputs(
+                runs=161651562, time=7.46, mem_used=0.0, mem_allocs=0),
+        ),
+        benchmark.BenchRes(
+            inputs=benchmark.BenchInputs(
+                subs=["first_bench"],
+                variables=[
+                    benchmark.BenchVarValue(var_name='first_var',
+                                            var_value='some_name'),
+                    benchmark.BenchVarValue(
+                        var_name='second_var', var_value=2),
+                    benchmark.BenchVarValue(
+                        var_name='third_var', var_value=1.01),
+                ]),
+            outputs=benchmark.BenchOutputs(
+                runs=181651562, time=8.46, mem_used=0.0, mem_allocs=0),
+        ),
+    ]
+
+    def test_get_var_names(self):
+        my_bench = benchmark.Benchmark("BenchmarkMyMethod")
+        for bench_res in self.sample_bench_results:
+            my_bench.add_result(bench_res)
+
+        expected_var_names = ["first_var", "second_var", "third_var"]
+        self.assertEqual(expected_var_names, my_bench.get_var_names())
+
+    def test_get_subs(self):
+        my_bench = benchmark.Benchmark("BenchmarkMyMethod")
+        for bench_res in self.sample_bench_results:
+            my_bench.add_result(bench_res)
+
+        expected_subs = ["first_bench"]
+        self.assertEqual(expected_subs, my_bench.get_subs())
+
+    def test_split_to(self):
+        my_bench = benchmark.Benchmark("BenchmarkMyMethod")
+        for bench_res in self.sample_bench_results:
+            my_bench.add_result(bench_res)
+
+        res = my_bench.split_to('second_var', 'time',
+                                'first_var', subs=['first_bench'])
+
+        expected_split_res = {
+            "first_var = some_name": [
+                benchmark.SplitRes(
+                    x=1, y=7.46),
+                benchmark.SplitRes(
+                    x=2, y=8.46),
+            ]
+        }
+
+        self.assertEqual(expected_split_res, res)
+
+
 class TestParseOutLine(unittest.TestCase):
     def test_bench_info(self):
         input_line = r'{"Time":"2020-01-30T12:53:44.276751-06:00","Action":"output","Package":"github.com/SomeUser/somepkg","Output":"BenchmarkMyMethod/some_case/first_var=some_name/second_var=1/third_var=1.00-4         \t"}'
@@ -10,7 +78,7 @@ class TestParseOutLine(unittest.TestCase):
                               "unexpected return type")
         self.assertEqual("BenchmarkMyMethod", parsed.name, "unexpected name")
         self.assertEqual(
-            ["some_case"], parsed.inputs.labels, "unexpected labels")
+            ["some_case"], parsed.inputs.subs, "unexpected subs")
         self.assertEqual(
             [
                 benchmark.BenchVarValue(var_name='first_var',

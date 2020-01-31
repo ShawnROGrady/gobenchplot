@@ -3,14 +3,38 @@ import json
 import re
 
 
+ResValue = typing.Union[int, str, float]
+
+
 class BenchVarValue(typing.NamedTuple):
     var_name: str
     var_value: typing.Union[int, str, float]
 
+    def __str__(self):
+        return "{} = {}".format(self.var_name, self.var_value)
+
+    def __hash__(self):
+        return hash((self.var_name, self.var_value))
+
+    def __eq__(self, other):
+        return self.var_name == other.var_name and self.var_value == other.var_value
+
+
+class BenchVarValues(typing.List[BenchVarValue]):
+    def __init__(self, values: typing.List[BenchVarValue]):
+        self._values = values
+
+    def __str__(self):
+        str_values: typing.List[str] = [str(value) for value in self._values]
+        return ", ".join(str_values)
+
+    def __hash__(self):
+        return hash(tuple(self._values))
+
 
 class BenchInputs(typing.NamedTuple):
     variables: typing.List[BenchVarValue]
-    labels: typing.Optional[typing.List[str]]
+    subs: typing.Optional[typing.List[str]]
 
 
 time_op_expr = re.compile(r'\s+([0-9\.]+) ([a-z])s\/op')
@@ -32,22 +56,119 @@ class BenchRes(typing.NamedTuple):
     def get_var_names(self) -> typing.List[str]:
         return list(map(lambda x: x.var_name, self.inputs.variables))
 
+    def get_subs(self) -> typing.Optional[typing.List[str]]:
+        return self.inputs.subs
+
+
+class SplitRes(typing.NamedTuple):
+    x: ResValue
+    y: ResValue
+
 
 class Benchmark:
     def __init__(self, name: str):
         self.name = name
         self._results: typing.List[BenchRes] = []
-        self._var_names: typing.Optional[typing.List[str]] = None
 
     def add_result(self, result: BenchRes):
         self._results.append(result)
 
     def get_var_names(self) -> typing.List[str]:
-        if self._var_names is not None:
-            return self._var_names
         if len(self._results) == 0:
             raise Exception("no results")
-        return self._results[0].get_var_names()
+        all_v_names: typing.List[str] = []
+        for res in self._results:
+            v_names = res.get_var_names()
+            for v_name in v_names:
+                if not v_name in all_v_names:
+                    all_v_names.append(v_name)
+        return all_v_names
+
+    def get_subs(self) -> typing.Optional[typing.List[str]]:
+        if len(self._results) == 0:
+            raise Exception("no results")
+        all_subs: typing.Optional[typing.List[str]] = None
+        for res in self._results:
+            subs = res.get_subs()
+            if subs is None:
+                continue
+            for sub in subs:
+                if all_subs is None:
+                    all_subs = []
+                if not sub in all_subs:
+                    all_subs.append(sub)
+        return all_subs
+
+    def split_to(self, x_name: str, y_name: str, group_by: typing.Union[typing.List[str], str], subs: typing.List[str] = []) -> typing.Dict[str, typing.List[SplitRes]]:
+        if len(self._results) == 0:
+            raise Exception("no results")
+        all_subs = self.get_subs()
+        if all_subs is not None and (len(subs) != len(all_subs)):
+            raise Exception(
+                "unexpected number of subs received (expected = %d, provided = %d)" % (len(all_subs), len(subs)))
+        # TODO: possibly raise exception if no subs present but provided
+
+        all_var_names = self.get_var_names()
+        if isinstance(group_by, typing.List):
+            for group_var_name in group_by:
+                if not group_var_name in all_var_names:
+                    raise Exception(
+                        "%s is not a defined variable of the benchmark" % (group_var_name))
+        elif isinstance(group_by, str):
+            if not group_by in all_var_names:
+                raise Exception(
+                    "%s is not a defined variable of the benchmark" % (group_by))
+        else:
+            raise Exception("invalid group_by = {}".format(group_by))
+
+        results: typing.List[BenchRes]
+        if len(subs) != 0:
+            results = list(
+                filter(lambda x: x.inputs.subs == subs, self._results))
+        else:
+            results = self._results
+
+        split_results: typing.Dict[str, typing.List[SplitRes]] = {}
+
+        grouped_results: typing.Dict[BenchVarValues,
+                                     typing.List[BenchRes]] = {}
+
+        for res in results:
+            group_vals: BenchVarValues
+            if isinstance(group_by, typing.List):
+                group_vals = BenchVarValues(list(
+                    filter(lambda x: x.var_name in group_by, res.inputs.variables)))
+            else:
+                group_vals = BenchVarValues(list(
+                    filter(lambda x: x.var_name == group_by, res.inputs.variables)))
+            if not group_vals in grouped_results:
+                grouped_results[group_vals] = [res]
+            else:
+                grouped_results[group_vals].append(res)
+
+        for var_value, var_results in grouped_results.items():
+            for res in var_results:
+                x_var: typing.Optional[BenchVarValue] = None
+                for var in res.inputs.variables:
+                    if var.var_name == x_name:
+                        x_var = var
+                        break
+
+                if x_var is None:
+                    raise Exception(
+                        "%s is not a defined variable of the benchmark" % (x_name))
+                if not str(var_value) in split_results:
+                    split_results[str(var_value)] = []
+
+                try:
+                    y_val = getattr(res.outputs, y_name)
+                    split_results[str(var_value)].append(
+                        SplitRes(x=x_var.var_value, y=y_val))
+                except AttributeError:
+                    raise Exception(
+                        "%s is not a defined output of the benchmark" % (y_name))
+
+        return split_results
 
 
 bench_info_expr = re.compile(r'^(Benchmark.+?)(?:\-[0-9])?\s+$')
@@ -88,7 +209,7 @@ def parse_out_line(line: str) -> typing.Optional[
 
         full_name = m[1]
         name: str = ''
-        labels: typing.Optional[typing.List[str]] = None
+        subs: typing.Optional[typing.List[str]] = None
         variables: typing.List[BenchVarValue] = []
 
         for i, value in enumerate(full_name.split('/')):
@@ -97,16 +218,16 @@ def parse_out_line(line: str) -> typing.Optional[
                 continue
             split_val = value.split("=")
             if len(split_val) != 2:
-                if labels is None:
-                    labels = [value]
+                if subs is None:
+                    subs = [value]
                 else:
-                    labels.append(value)
+                    subs.append(value)
             else:
                 variables.append(
                     BenchVarValue(var_name=split_val[0], var_value=var_value(split_val[1])))
         return BenchInfo(
             name=name,
-            inputs=BenchInputs(variables=variables, labels=labels))
+            inputs=BenchInputs(variables=variables, subs=subs))
     else:
         # BenchOutputs
         vals = output_info.split('\t')
