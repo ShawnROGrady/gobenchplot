@@ -60,9 +60,7 @@ class BenchRes(typing.NamedTuple):
         return self.inputs.subs
 
 
-class SplitRes(typing.NamedTuple):
-    x: ResValue
-    y: ResValue
+GroupedResults = typing.Dict[BenchVarValues, typing.List[BenchRes]]
 
 
 class Benchmark:
@@ -99,7 +97,10 @@ class Benchmark:
                     all_subs.append(sub)
         return all_subs
 
-    def split_to(self, x_name: str, y_name: str, group_by: typing.Union[typing.List[str], str], subs: typing.List[str] = []) -> typing.Dict[str, typing.List[SplitRes]]:
+    def grouped_results(
+            self,
+            group_by: typing.Union[typing.List[str], str],
+            subs: typing.List[str] = []) -> GroupedResults:
         if len(self._results) == 0:
             raise Exception("no results")
         # TODO: validate subs
@@ -124,10 +125,7 @@ class Benchmark:
         else:
             results = self._results
 
-        split_results: typing.Dict[str, typing.List[SplitRes]] = {}
-
-        grouped_results: typing.Dict[BenchVarValues,
-                                     typing.List[BenchRes]] = {}
+        grouped_results: GroupedResults = {}
 
         for res in results:
             group_vals: BenchVarValues
@@ -142,29 +140,7 @@ class Benchmark:
             else:
                 grouped_results[group_vals].append(res)
 
-        for var_value, var_results in grouped_results.items():
-            for res in var_results:
-                x_var: typing.Optional[BenchVarValue] = None
-                for var in res.inputs.variables:
-                    if var.var_name == x_name:
-                        x_var = var
-                        break
-
-                if x_var is None:
-                    raise Exception(
-                        "%s is not a defined variable of the benchmark" % (x_name))
-                if not str(var_value) in split_results:
-                    split_results[str(var_value)] = []
-
-                try:
-                    y_val = getattr(res.outputs, y_name)
-                    split_results[str(var_value)].append(
-                        SplitRes(x=x_var.var_value, y=y_val))
-                except AttributeError:
-                    raise Exception(
-                        "%s is not a defined output of the benchmark" % (y_name))
-
-        return split_results
+        return grouped_results
 
 
 bench_info_expr = re.compile(r'^(Benchmark.+?)(?:\-[0-9])?\s+$')

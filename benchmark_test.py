@@ -51,24 +51,23 @@ class TestBenchmark(unittest.TestCase):
         expected_subs = ["first_bench"]
         self.assertEqual(expected_subs, my_bench.get_subs())
 
-    def test_split_to(self):
+    def test_grouped_results(self):
         my_bench = benchmark.Benchmark("BenchmarkMyMethod")
         for bench_res in self.sample_bench_results:
             my_bench.add_result(bench_res)
 
-        res = my_bench.split_to('second_var', 'time',
-                                'first_var', subs=['first_bench'])
+        res = my_bench.grouped_results('first_var', subs=['first_bench'])
 
-        expected_split_res = {
-            "first_var = some_name": [
-                benchmark.SplitRes(
-                    x=1, y=7.46),
-                benchmark.SplitRes(
-                    x=2, y=8.46),
-            ]
+        group_vals = benchmark.BenchVarValues([
+            benchmark.BenchVarValue(var_name='first_var',
+                                    var_value='some_name'),
+        ])
+        group_res: benchmark.GroupedResults = self.sample_bench_results
+        expected_grouped_res: benchmark.GroupedResults = {
+            group_vals: [group_res[0], group_res[1]],
         }
 
-        self.assertEqual(expected_split_res, res)
+        self.assertEqual(expected_grouped_res, res)
 
 
 class TestParseOutLine(unittest.TestCase):
