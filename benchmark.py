@@ -37,14 +37,14 @@ class BenchInputs(typing.NamedTuple):
     subs: typing.Optional[typing.List[str]]
 
 
-time_op_expr = re.compile(r'\s+([0-9\.]+) ([a-z])s\/op')
+time_op_expr = re.compile(r'\s+([0-9\.]+) ns\/op')
 allocs_op_expr = re.compile(r'\s+([0-9]+) allocs\/op')
 used_op_expr = re.compile(r'\s+([0-9\.]+) ([A-Z]?)B\/op')
 
 
 class BenchOutputs(typing.NamedTuple):
     runs: int
-    time: float  # duration per op (expressed in seconds)
+    time: float  # duration per op (expressed in nanoseconds)
     mem_allocs: typing.Optional[int]  # allocs per op
     mem_used: typing.Optional[float]  # B per op
 
@@ -198,10 +198,7 @@ def parse_out_line(line: str) -> typing.Optional[
         return None
 
     output_info = bench_line["Output"]
-    if output_info.startswith('pkg') or output_info.startswith('goos') or output_info.startswith('goarch'):
-        # ignore
-        return None
-    elif output_info.startswith("Benchmark"):
+    if output_info.startswith("Benchmark"):
         # BenchInfo
         m = bench_info_expr.match(output_info)
         if not m:
@@ -228,7 +225,7 @@ def parse_out_line(line: str) -> typing.Optional[
         return BenchInfo(
             name=name,
             inputs=BenchInputs(variables=variables, subs=subs))
-    else:
+    elif output_info.lstrip()[0].isdigit():
         # BenchOutputs
         vals = output_info.split('\t')
         runs: int = int(vals[0])
@@ -258,3 +255,43 @@ def parse_out_line(line: str) -> typing.Optional[
             raise Exception("no time found")
 
     return None
+
+
+class BenchSuite:
+    def __init__(self):
+        self._benchmarks: typing.List[Benchmark] = []
+        self._current_bench: typing.Optional[BenchInfo] = None
+
+    def readline(self, line: str):
+        res = parse_out_line(line)
+        if res is None:
+            return
+        if isinstance(res, BenchInfo):
+            self._current_bench = res
+            return
+        if isinstance(res, BenchOutputs):
+            if self._current_bench is None:
+                raise Exception("bench outputs provided before bench info")
+
+            existing_bench = self.get_benchmark(self._current_bench.name)
+            if existing_bench:
+                existing_bench.add_result(BenchRes(
+                    inputs=self._current_bench.inputs,
+                    outputs=res))
+            else:
+                new_bench = Benchmark(self._current_bench.name)
+                new_bench.add_result(BenchRes(
+                    inputs=self._current_bench.inputs,
+                    outputs=res))
+                self._benchmarks.append(new_bench)
+            self._current_bench = None
+
+    def get_benchmark(self, name) -> typing.Optional[Benchmark]:
+        for bench in self._benchmarks:
+            if bench.name == name:
+                return bench
+
+        return None
+
+    def get_benchmarks(self) -> typing.List[Benchmark]:
+        return self._benchmarks
