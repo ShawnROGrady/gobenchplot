@@ -1,4 +1,6 @@
+import copy
 import benchmark
+import functools
 import unittest
 import collections
 
@@ -57,7 +59,7 @@ class TestBenchmark(unittest.TestCase):
         for bench_res in list(sample_bench_results):
             my_bench.add_result(bench_res)
 
-        res = my_bench.grouped_results('first_var', subs=['first_bench'])
+        res = my_bench.grouped_results('first_var')
 
         group_vals = benchmark.BenchVarValues([
             benchmark.BenchVarValue(var_name='first_var',
@@ -94,6 +96,246 @@ class TestGroupedResults(unittest.TestCase):
         }
 
         self.assertEqual(expected_split_res, res)
+
+    def test_filtered_by_subs(self):
+        group_vals = benchmark.BenchVarValues([
+            benchmark.BenchVarValue(var_name='first_var',
+                                    var_value='some_name'),
+        ])
+        group_res = list(sample_bench_results)
+        group_res.append(benchmark.BenchRes(
+            inputs=benchmark.BenchInputs(
+                subs=["second_bench"],
+                variables=[
+                    benchmark.BenchVarValue(var_name='first_var',
+                                            var_value='some_name'),
+                    benchmark.BenchVarValue(
+                        var_name='second_var', var_value=3),
+                    benchmark.BenchVarValue(
+                        var_name='third_var', var_value=1.02),
+                ]),
+            outputs=benchmark.BenchOutputs(
+                runs=191651562, time=8.46, mem_used=0.0, mem_allocs=0),
+        ))
+        TestCase = collections.namedtuple(
+            'TestCase', 'initdata subs expected_filtered')
+
+        test_cases = {
+            'already_filtered': TestCase(
+                initdata={group_vals: benchmark.BenchResults(
+                    [group_res[0], group_res[1]])},
+                subs=['first_bench'],
+                expected_filtered={group_vals: [group_res[0], group_res[1]]}),
+            'valid_filter': TestCase(
+                initdata={group_vals: benchmark.BenchResults(
+                    [group_res[0], group_res[1], group_res[2]])},
+                subs=['first_bench'],
+                expected_filtered={group_vals: [group_res[0], group_res[1]]}),
+            'no_matches': TestCase(
+                initdata={group_vals: [group_res[0], group_res[1]]},
+                subs=['second_bench'],
+                expected_filtered={}),
+        }
+
+        for test_name, test_case in test_cases.items():
+            with self.subTest(test_name):
+                grouped_res: benchmark.GroupedResults = benchmark.GroupedResults(
+                    initdata=test_case.initdata)
+                filtered = grouped_res.filtered_by_subs(test_case.subs)
+                self.assertEqual(test_case.expected_filtered, filtered)
+
+    def test_filtered_by_var_value(self):
+        group_vals = benchmark.BenchVarValues([
+            benchmark.BenchVarValue(var_name='first_var',
+                                    var_value='some_name'),
+        ])
+        group_res: benchmark.GroupedResults = list(sample_bench_results)
+        TestCase = collections.namedtuple(
+            'TestCase', 'initdata value expected_filtered')
+
+        test_cases = {
+            'already_filtered': TestCase(
+                initdata={group_vals: benchmark.BenchResults(
+                    [group_res[0], group_res[1]])},
+                value=benchmark.BenchVarValue(var_name='first_var',
+                                              var_value='some_name'),
+                expected_filtered={group_vals: [group_res[0], group_res[1]]}),
+            'valid_filter': TestCase(
+                initdata={group_vals: benchmark.BenchResults(
+                    [group_res[0], group_res[1]])},
+                value=benchmark.BenchVarValue(var_name='second_var',
+                                              var_value=2),
+                expected_filtered={group_vals:  [group_res[1]]}),
+            'no_matches': TestCase(
+                initdata={group_vals: [group_res[0], group_res[1]]},
+                value=benchmark.BenchVarValue(var_name='second_var',
+                                              var_value=20),
+                expected_filtered={}),
+        }
+
+        for test_name, test_case in test_cases.items():
+            with self.subTest(test_name):
+                grouped_res: benchmark.GroupedResults = benchmark.GroupedResults(
+                    initdata=test_case.initdata)
+                filtered = grouped_res.filtered_by_var_value(test_case.value)
+                self.assertEqual(test_case.expected_filtered, filtered)
+
+
+class TestFilterResults(unittest.TestCase):
+    TestCase = collections.namedtuple(
+        'TestCase', 'initial_res filter_exprs expected_filtered')
+
+    group_vals = benchmark.BenchVarValues([
+        benchmark.BenchVarValue(var_name='first_var',
+                                var_value='some_name'),
+    ])
+    group_res = list(sample_bench_results)
+    group_res.append(benchmark.BenchRes(
+        inputs=benchmark.BenchInputs(
+            subs=["second_bench"],
+            variables=[
+                benchmark.BenchVarValue(var_name='first_var',
+                                        var_value='some_name'),
+                benchmark.BenchVarValue(
+                    var_name='second_var', var_value=2),
+                benchmark.BenchVarValue(
+                    var_name='third_var', var_value=1.02),
+            ]),
+        outputs=benchmark.BenchOutputs(
+            runs=191651562, time=8.46, mem_used=0.0, mem_allocs=0),
+    ))
+
+    def test_filter_grouped_results(self):
+        test_cases = {
+            'already_filtered_by_subs': self.TestCase(
+                initial_res=benchmark.GroupedResults(initdata={self.group_vals: benchmark.BenchResults(
+                    [self.group_res[0], self.group_res[1]])}),
+                filter_exprs=[benchmark.filter_expr(['first_bench'])],
+                expected_filtered={self.group_vals: [self.group_res[0], self.group_res[1]]}),
+            'valid_filter_by_subs': self.TestCase(
+                initial_res=benchmark.GroupedResults(initdata={self.group_vals: benchmark.BenchResults(
+                    [self.group_res[0], self.group_res[1], self.group_res[2]])}),
+                filter_exprs=[benchmark.filter_expr(['first_bench'])],
+                expected_filtered={self.group_vals: [self.group_res[0], self.group_res[1]]}),
+            'valid_filter_by_subs_and_vars': self.TestCase(
+                initial_res=benchmark.GroupedResults(initdata={self.group_vals: benchmark.BenchResults(
+                    [self.group_res[0], self.group_res[1], self.group_res[2]])}),
+                filter_exprs=[
+                    benchmark.filter_expr(['first_bench']),
+                    benchmark.filter_expr(benchmark.BenchVarValue(var_name='second_var',
+                                                                  var_value=2)),
+                ],
+                expected_filtered={self.group_vals: [self.group_res[1]]}),
+            'valid_filter_by_subs': self.TestCase(
+                initial_res=benchmark.GroupedResults(initdata={self.group_vals: benchmark.BenchResults(
+                    [self.group_res[0], self.group_res[1], self.group_res[2]])}),
+                filter_exprs=[
+                    benchmark.filter_expr(['second_bench']),
+                ],
+                expected_filtered={self.group_vals: [self.group_res[2]]}),
+            'valid_filter_by_vars': self.TestCase(
+                initial_res=benchmark.GroupedResults(initdata={self.group_vals: benchmark.BenchResults(
+                    [self.group_res[0], self.group_res[1], self.group_res[2]])}),
+                filter_exprs=[
+                    benchmark.filter_expr(benchmark.BenchVarValue(var_name='third_var',
+                                                                  var_value=1.01)),
+                    benchmark.filter_expr(benchmark.BenchVarValue(var_name='second_var',
+                                                                  var_value=2)),
+                ],
+                expected_filtered={self.group_vals: [self.group_res[1]]}),
+            'no_matching_var_combo': self.TestCase(
+                initial_res=benchmark.GroupedResults(initdata={self.group_vals: benchmark.BenchResults(
+                    [self.group_res[0], self.group_res[1], self.group_res[2]])}),
+                filter_exprs=[
+                    benchmark.filter_expr(benchmark.BenchVarValue(var_name='third_var',
+                                                                  var_value=1.01)),
+                    benchmark.filter_expr(benchmark.BenchVarValue(var_name='second_var',
+                                                                  var_value=3)),
+                ],
+                expected_filtered={}),
+            'no_matching_var-sub_combo': self.TestCase(
+                initial_res=benchmark.GroupedResults(initdata={self.group_vals: benchmark.BenchResults(
+                    [self.group_res[0], self.group_res[1], self.group_res[2]])}),
+                filter_exprs=[
+                    benchmark.filter_expr(['second_bench']),
+                    benchmark.filter_expr(benchmark.BenchVarValue(var_name='third_var',
+                                                                  var_value=1.01)),
+                ],
+                expected_filtered={}),
+        }
+
+        for test_name, test_case in test_cases.items():
+            with self.subTest(test_name):
+                filtered = copy.deepcopy(test_case.initial_res)
+                for expr in test_case.filter_exprs:
+                    filtered = expr(filtered)
+                self.assertEqual(test_case.expected_filtered, filtered)
+
+    def test_filter_bench_results(self):
+        test_cases = {
+            'already_filtered_by_subs': self.TestCase(
+                initial_res=benchmark.BenchResults(
+                    [self.group_res[0], self.group_res[1]]),
+                filter_exprs=[benchmark.filter_expr(['first_bench'])],
+                expected_filtered=[self.group_res[0], self.group_res[1]]),
+            'valid_filter_by_subs': self.TestCase(
+                initial_res=benchmark.BenchResults(
+                    [self.group_res[0], self.group_res[1], self.group_res[2]]),
+                filter_exprs=[benchmark.filter_expr(['first_bench'])],
+                expected_filtered=[self.group_res[0], self.group_res[1]]),
+            'valid_filter_by_subs_and_vars': self.TestCase(
+                initial_res=benchmark.BenchResults(
+                    [self.group_res[0], self.group_res[1], self.group_res[2]]),
+                filter_exprs=[
+                    benchmark.filter_expr(['first_bench']),
+                    benchmark.filter_expr(benchmark.BenchVarValue(var_name='second_var',
+                                                                  var_value=2)),
+                ],
+                expected_filtered=[self.group_res[1]]),
+            'valid_filter_by_subs': self.TestCase(
+                initial_res=benchmark.BenchResults(
+                    [self.group_res[0], self.group_res[1], self.group_res[2]]),
+                filter_exprs=[
+                    benchmark.filter_expr(['second_bench']),
+                ],
+                expected_filtered=[self.group_res[2]]),
+            'valid_filter_by_vars': self.TestCase(
+                initial_res=benchmark.BenchResults(
+                    [self.group_res[0], self.group_res[1], self.group_res[2]]),
+                filter_exprs=[
+                    benchmark.filter_expr(benchmark.BenchVarValue(var_name='third_var',
+                                                                  var_value=1.01)),
+                    benchmark.filter_expr(benchmark.BenchVarValue(var_name='second_var',
+                                                                  var_value=2)),
+                ],
+                expected_filtered=[self.group_res[1]]),
+            'no_matching_var_combo': self.TestCase(
+                initial_res=benchmark.BenchResults(
+                    [self.group_res[0], self.group_res[1], self.group_res[2]]),
+                filter_exprs=[
+                    benchmark.filter_expr(benchmark.BenchVarValue(var_name='third_var',
+                                                                  var_value=1.01)),
+                    benchmark.filter_expr(benchmark.BenchVarValue(var_name='second_var',
+                                                                  var_value=3)),
+                ],
+                expected_filtered=[]),
+            'no_matching_var-sub_combo': self.TestCase(
+                initial_res=benchmark.BenchResults(
+                    [self.group_res[0], self.group_res[1], self.group_res[2]]),
+                filter_exprs=[
+                    benchmark.filter_expr(['second_bench']),
+                    benchmark.filter_expr(benchmark.BenchVarValue(var_name='third_var',
+                                                                  var_value=1.01)),
+                ],
+                expected_filtered=[]),
+        }
+
+        for test_name, test_case in test_cases.items():
+            with self.subTest(test_name):
+                filtered = copy.deepcopy(test_case.initial_res)
+                for expr in test_case.filter_exprs:
+                    filtered = expr(filtered)
+                self.assertEqual(test_case.expected_filtered, filtered)
 
 
 class TestParseOutLine(unittest.TestCase):

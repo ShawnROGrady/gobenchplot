@@ -5,10 +5,6 @@ import plot
 import benchmark
 
 
-def plot_bench(bench: benchmark.Benchmark, group_by: typing.Union[typing.List[str], str], x_name: str, y_name: str = 'time', subs: typing.List = []):
-    plot.plot_bench(bench, group_by, x_name, y_name, subs)
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(
         description='Plots the results of a go benchmark')
@@ -43,6 +39,11 @@ def main() -> int:
         dest='subs',
         nargs='+',
         help="the sub-benchmark(s) to plot")
+    parser.add_argument(
+        '--filter-by',
+        dest='filter_vars',
+        nargs='+',
+        help='the variables to filter results by (form: var_name=var_value)')
 
     args = parser.parse_args()
 
@@ -61,11 +62,9 @@ def main() -> int:
             print("no bench '%s' found" % (args.bench), file=sys.stderr)
             return 1
 
-        if args.subs is not None:
-            plot_bench(bench, args.group_by, args.x,
-                       y_name=args.y, subs=args.subs)
         else:
-            plot_bench(bench, args.group_by, args.x, y_name=args.y)
+            plot.plot_bench(bench, args.group_by, args.x, y_name=args.y,
+                            subs=args.subs, filter_vars=args.filter_vars)
     else:
         # TODO: should just plot all benchmarks
         print("need to provide benchmark name", file=sys.stderr)

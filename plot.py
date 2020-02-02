@@ -1,3 +1,4 @@
+import copy
 import matplotlib.pyplot as plt
 import numpy as np
 import typing
@@ -21,14 +22,19 @@ def bench_res_data(bench_results: typing.List[benchmark.SplitRes]) -> PlotData:
     return PlotData(x=x, y=y)
 
 
-def plot_bench(bench: benchmark.Benchmark, group_by: typing.Union[typing.List[str], str], x_name: str, y_name: str = 'time', subs: typing.List = []):
-    split_res: benchmark.SplitResults = bench.grouped_results(
-        group_by, subs).split_to(x_name, y_name)
-
-    if len(subs) == 0:
+def plot_bench(bench: benchmark.Benchmark, group_by: typing.Union[typing.List[str], str], x_name: str, y_name: str = 'time', subs: typing.List = None, filter_vars: typing.List[str] = None):
+    if subs is None or len(subs) == 0:
         plt.title(bench.name)
     else:
         plt.title("%s/%s" % (bench.name, "/".join(subs)))
+
+    filter_exprs = benchmark.build_filter_exprs(subs, filter_vars)
+    filtered: benchmark.BenchResults = copy.deepcopy(bench.results)
+    for expr in filter_exprs:
+        filtered = expr(filtered)
+
+    split_res: benchmark.SplitResults = filtered.group_by(
+        group_by).split_to(x_name, y_name)
 
     ax = plt.gca()
     for label, res in split_res.items():

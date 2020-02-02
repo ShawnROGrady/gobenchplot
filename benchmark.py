@@ -1,5 +1,6 @@
 import typing
 import json
+from functools import singledispatch
 import re
 
 
@@ -17,6 +18,8 @@ class BenchVarValue(typing.NamedTuple):
         return hash((self.var_name, self.var_value))
 
     def __eq__(self, other):
+        if not isinstance(other, BenchVarValue):
+            return False
         return self.var_name == other.var_name and self.var_value == other.var_value
 
 
@@ -30,6 +33,9 @@ class BenchVarValues(typing.List[BenchVarValue]):
 
     def __hash__(self):
         return hash(tuple(self._values))
+
+    def __contains__(self, other) -> bool:
+        return other in self._values
 
 
 class BenchInputs(typing.NamedTuple):
@@ -69,13 +75,16 @@ SplitResults = typing.Dict[str, typing.List[SplitRes]]
 
 
 class GroupedResults(dict):
-    def __init__(self, initdata: typing.Dict[BenchVarValues, typing.List[BenchRes]] = {}):
-        dict.__init__(self, initdata)
+    def __init__(self, initdata: typing.Dict[BenchVarValues, 'BenchResults'] = None):
+        if initdata is None:
+            dict.__init__(self, {})
+        else:
+            dict.__init__(self, initdata)
 
     def __getitem__(self, key: BenchVarValues):
         return dict.__getitem__(self, key)
 
-    def __setitem__(self, key: BenchVarValues, val: typing.List[BenchRes]):
+    def __setitem__(self, key: BenchVarValues, val: 'BenchResults'):
         dict.__setitem__(self, key, val)
 
     def items(self):
@@ -84,6 +93,34 @@ class GroupedResults(dict):
     def update(self, *args, **kwargs):
         for k, v in dict(*args, **kwargs).items():
             self[k] = v
+
+    def filtered_by_subs(self, subs: typing.List[str]) -> 'GroupedResults':
+        filtered: typing.Dict[BenchVarValues, 'BenchResults'] = {}
+        for k, v in self.items():
+            filtered_results: BenchResults
+            if isinstance(v, BenchResults):
+                filtered_results = v.filtered_by_subs(subs)
+            else:
+                filtered_results = BenchResults(v).filtered_by_subs(subs)
+
+            if len(filtered_results) != 0:
+                filtered[k] = filtered_results
+
+        return GroupedResults(initdata=filtered)
+
+    def filtered_by_var_value(self, value: BenchVarValue) -> 'GroupedResults':
+        filtered: typing.Dict[BenchVarValues, 'BenchResults'] = {}
+        for k, v in self.items():
+            filtered_results: BenchResults
+            if isinstance(v, BenchResults):
+                filtered_results = v.filtered_by_var_value(value)
+            else:
+                filtered_results = BenchResults(v).filtered_by_var_value(value)
+
+            if len(filtered_results) != 0:
+                filtered[k] = filtered_results
+
+        return GroupedResults(initdata=filtered)
 
     def split_to(self, x_name: str, y_name: str) -> SplitResults:
         split_results: SplitResults = {}
@@ -136,6 +173,16 @@ class BenchResults:
     def __delitem__(self, key: int):
         self._data.__delitem__(key)
 
+    def list(self) -> typing.List[BenchRes]:
+        return self._data
+
+    def __eq__(self, other) -> bool:
+        if isinstance(other, list):
+            return other == self._data
+        if isinstance(other, BenchResults):
+            return list(other) == self._data
+        return False
+
     def get_var_names(self) -> typing.List[str]:
         all_v_names: typing.List[str] = []
         for res in self._data:
@@ -158,10 +205,21 @@ class BenchResults:
                     all_subs.append(sub)
         return all_subs
 
+    def filtered_by_subs(self, subs: typing.List[str]) -> 'BenchResults':
+        filtered_results: typing.List[BenchRes]
+        filtered_results = list(
+            filter(lambda x: x.inputs.subs == subs, self._data))
+        return BenchResults(filtered_results)
+
+    def filtered_by_var_value(self, value: BenchVarValue) -> 'BenchResults':
+        filtered_results: typing.List[BenchRes]
+        filtered_results = list(
+            filter(lambda x: value in x.inputs.variables, self._data))
+        return BenchResults(filtered_results)
+
     def group_by(
             self,
-            group_by: typing.Union[typing.List[str], str],
-            subs: typing.List[str] = []) -> GroupedResults:
+            group_by: typing.Union[typing.List[str], str]) -> GroupedResults:
         all_var_names = self.get_var_names()
         # TODO: validate subs
         if isinstance(group_by, typing.List):
@@ -176,16 +234,9 @@ class BenchResults:
         else:
             raise Exception("invalid group_by = {}".format(group_by))
 
-        results: typing.List[BenchRes]
-        if len(subs) != 0:
-            results = list(
-                filter(lambda x: x.inputs.subs == subs, self._data))
-        else:
-            results = self._data
-
         grouped_results: GroupedResults = GroupedResults()
 
-        for res in results:
+        for res in self._data:
             group_vals: BenchVarValues
             if isinstance(group_by, typing.List):
                 group_vals = BenchVarValues(list(
@@ -194,7 +245,7 @@ class BenchResults:
                 group_vals = BenchVarValues(list(
                     filter(lambda x: x.var_name == group_by, res.inputs.variables)))
             if not group_vals in grouped_results:
-                grouped_results[group_vals] = [res]
+                grouped_results[group_vals] = BenchResults([res])
             else:
                 grouped_results[group_vals].append(res)
 
@@ -219,13 +270,57 @@ class Benchmark:
             raise Exception("no results")
         return self._results.get_subs()
 
+    @property
+    def results(self) -> BenchResults:
+        return self._results
+
     def grouped_results(
             self,
-            group_by: typing.Union[typing.List[str], str],
-            subs: typing.List[str] = []) -> GroupedResults:
+            group_by: typing.Union[typing.List[str], str]) -> GroupedResults:
         if len(self._results) == 0:
             raise Exception("no results")
-        return self._results.group_by(group_by, subs=subs)
+        return self._results.group_by(group_by)
+
+
+@singledispatch
+def filter_results(filter_by, res: typing.Union[GroupedResults, BenchResults]) -> typing.Union[GroupedResults, BenchResults]:
+    return res
+
+
+@filter_results.register(BenchVarValue)
+def filter_by_var_value(filter_by: BenchVarValue, res: typing.Union[GroupedResults, BenchResults]) -> typing.Union[GroupedResults, BenchResults]:
+    return res.filtered_by_var_value(filter_by)
+
+
+@filter_results.register(list)
+def filter_by_subs(filter_by: typing.List[str], res: typing.Union[GroupedResults, BenchResults]) -> typing.Union[GroupedResults, BenchResults]:
+    return res.filtered_by_subs(filter_by)
+
+
+def filter_expr(filter_by):
+    def filter_fn(res):
+        return filter_results(filter_by, res)
+    return filter_fn
+
+
+def build_filter_exprs(
+        subs: typing.Optional[typing.List[str]],
+        var_values: typing.Optional[typing.List[str]]):
+
+    exprs = []
+    if subs is not None and len(subs) != 0:
+        exprs.append(filter_expr(subs))
+
+    if var_values is not None and len(var_values) != 0:
+        for value in var_values:
+            split_val = value.replace(" ", "").split("=")
+            if len(split_val) != 2:
+                raise Exception(
+                    "var filter expected to be of form 'var_name=var_value', received: %s" % (value))
+            var = BenchVarValue(
+                var_name=split_val[0], var_value=var_value(split_val[1]))
+            exprs.append(filter_expr(var))
+    return exprs
 
 
 bench_info_expr = re.compile(r'^(Benchmark.+?)(?:\-[0-9])?\s+$')
