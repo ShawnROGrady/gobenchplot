@@ -111,19 +111,34 @@ class GroupedResults(dict):
         return split_results
 
 
-class Benchmark:
-    def __init__(self, name: str):
-        self.name = name
-        self._results: typing.List[BenchRes] = []
+class BenchResults:
+    def __init__(self, initdata: typing.List[BenchRes]):
+        self._data = initdata
 
-    def add_result(self, result: BenchRes):
-        self._results.append(result)
+    def __getitem__(self, key: int) -> BenchRes:
+        return self._data[key]
+
+    def __setitem__(self, key: int, val: BenchRes):
+        self._data[key] = val
+
+    def __len__(self) -> int:
+        return len(self._data)
+
+    def __iter__(self):
+        return self._data.__iter__()
+
+    def __contains__(self, item: BenchRes):
+        return self._data.__contains__(item)
+
+    def append(self, item: BenchRes):
+        return self._data.append(item)
+
+    def __delitem__(self, key: int):
+        self._data.__delitem__(key)
 
     def get_var_names(self) -> typing.List[str]:
-        if len(self._results) == 0:
-            raise Exception("no results")
         all_v_names: typing.List[str] = []
-        for res in self._results:
+        for res in self._data:
             v_names = res.get_var_names()
             for v_name in v_names:
                 if not v_name in all_v_names:
@@ -131,10 +146,8 @@ class Benchmark:
         return all_v_names
 
     def get_subs(self) -> typing.Optional[typing.List[str]]:
-        if len(self._results) == 0:
-            raise Exception("no results")
         all_subs: typing.Optional[typing.List[str]] = None
-        for res in self._results:
+        for res in self._data:
             subs = res.get_subs()
             if subs is None:
                 continue
@@ -145,15 +158,12 @@ class Benchmark:
                     all_subs.append(sub)
         return all_subs
 
-    def grouped_results(
+    def group_by(
             self,
             group_by: typing.Union[typing.List[str], str],
             subs: typing.List[str] = []) -> GroupedResults:
-        if len(self._results) == 0:
-            raise Exception("no results")
-        # TODO: validate subs
-
         all_var_names = self.get_var_names()
+        # TODO: validate subs
         if isinstance(group_by, typing.List):
             for group_var_name in group_by:
                 if not group_var_name in all_var_names:
@@ -169,9 +179,9 @@ class Benchmark:
         results: typing.List[BenchRes]
         if len(subs) != 0:
             results = list(
-                filter(lambda x: x.inputs.subs == subs, self._results))
+                filter(lambda x: x.inputs.subs == subs, self._data))
         else:
-            results = self._results
+            results = self._data
 
         grouped_results: GroupedResults = GroupedResults()
 
@@ -189,6 +199,33 @@ class Benchmark:
                 grouped_results[group_vals].append(res)
 
         return grouped_results
+
+
+class Benchmark:
+    def __init__(self, name: str):
+        self.name = name
+        self._results: BenchResults = BenchResults([])
+
+    def add_result(self, result: BenchRes):
+        self._results.append(result)
+
+    def get_var_names(self) -> typing.List[str]:
+        if len(self._results) == 0:
+            raise Exception("no results")
+        return self._results.get_var_names()
+
+    def get_subs(self) -> typing.Optional[typing.List[str]]:
+        if len(self._results) == 0:
+            raise Exception("no results")
+        return self._results.get_subs()
+
+    def grouped_results(
+            self,
+            group_by: typing.Union[typing.List[str], str],
+            subs: typing.List[str] = []) -> GroupedResults:
+        if len(self._results) == 0:
+            raise Exception("no results")
+        return self._results.group_by(group_by, subs=subs)
 
 
 bench_info_expr = re.compile(r'^(Benchmark.+?)(?:\-[0-9])?\s+$')
