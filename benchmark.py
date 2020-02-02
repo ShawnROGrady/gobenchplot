@@ -60,7 +60,55 @@ class BenchRes(typing.NamedTuple):
         return self.inputs.subs
 
 
-GroupedResults = typing.Dict[BenchVarValues, typing.List[BenchRes]]
+class SplitRes(typing.NamedTuple):
+    x: ResValue
+    y: ResValue
+
+
+SplitResults = typing.Dict[str, typing.List[SplitRes]]
+
+
+class GroupedResults(dict):
+    def __init__(self, initdata: typing.Dict[BenchVarValues, typing.List[BenchRes]] = {}):
+        dict.__init__(self, initdata)
+
+    def __getitem__(self, key: BenchVarValues):
+        return dict.__getitem__(self, key)
+
+    def __setitem__(self, key: BenchVarValues, val: typing.List[BenchRes]):
+        dict.__setitem__(self, key, val)
+
+    def items(self):
+        return dict.items(self)
+
+    def update(self, *args, **kwargs):
+        for k, v in dict(*args, **kwargs).items():
+            self[k] = v
+
+    def split_to(self, x_name: str, y_name: str) -> SplitResults:
+        split_results: SplitResults = {}
+        for var_value, var_results in dict.items(self):
+            for res in var_results:
+                x_var: typing.Optional[BenchVarValue] = None
+                for var in res.inputs.variables:
+                    if var.var_name == x_name:
+                        x_var = var
+                        break
+
+                if x_var is None:
+                    raise Exception(
+                        "%s is not a defined variable of the benchmark" % (x_name))
+                if not str(var_value) in split_results:
+                    split_results[str(var_value)] = []
+
+                try:
+                    y_val = getattr(res.outputs, y_name)
+                    split_results[str(var_value)].append(
+                        SplitRes(x=x_var.var_value, y=y_val))
+                except AttributeError:
+                    raise Exception(
+                        "%s is not a defined output of the benchmark" % (y_name))
+        return split_results
 
 
 class Benchmark:
@@ -125,7 +173,7 @@ class Benchmark:
         else:
             results = self._results
 
-        grouped_results: GroupedResults = {}
+        grouped_results: GroupedResults = GroupedResults()
 
         for res in results:
             group_vals: BenchVarValues

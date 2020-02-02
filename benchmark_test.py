@@ -2,42 +2,43 @@ import benchmark
 import unittest
 import collections
 
+sample_bench_results = (
+    benchmark.BenchRes(
+        inputs=benchmark.BenchInputs(
+            subs=["first_bench"],
+            variables=[
+                benchmark.BenchVarValue(var_name='first_var',
+                                        var_value='some_name'),
+                benchmark.BenchVarValue(
+                    var_name='second_var', var_value=1),
+                benchmark.BenchVarValue(
+                    var_name='third_var', var_value=1.00),
+            ]),
+        outputs=benchmark.BenchOutputs(
+            runs=161651562, time=7.46, mem_used=0.0, mem_allocs=0),
+    ),
+    benchmark.BenchRes(
+        inputs=benchmark.BenchInputs(
+            subs=["first_bench"],
+            variables=[
+                benchmark.BenchVarValue(var_name='first_var',
+                                        var_value='some_name'),
+                benchmark.BenchVarValue(
+                    var_name='second_var', var_value=2),
+                benchmark.BenchVarValue(
+                    var_name='third_var', var_value=1.01),
+            ]),
+        outputs=benchmark.BenchOutputs(
+            runs=181651562, time=8.46, mem_used=0.0, mem_allocs=0),
+    ),
+)
+
 
 class TestBenchmark(unittest.TestCase):
-    sample_bench_results = [
-        benchmark.BenchRes(
-            inputs=benchmark.BenchInputs(
-                subs=["first_bench"],
-                variables=[
-                    benchmark.BenchVarValue(var_name='first_var',
-                                            var_value='some_name'),
-                    benchmark.BenchVarValue(
-                        var_name='second_var', var_value=1),
-                    benchmark.BenchVarValue(
-                        var_name='third_var', var_value=1.00),
-                ]),
-            outputs=benchmark.BenchOutputs(
-                runs=161651562, time=7.46, mem_used=0.0, mem_allocs=0),
-        ),
-        benchmark.BenchRes(
-            inputs=benchmark.BenchInputs(
-                subs=["first_bench"],
-                variables=[
-                    benchmark.BenchVarValue(var_name='first_var',
-                                            var_value='some_name'),
-                    benchmark.BenchVarValue(
-                        var_name='second_var', var_value=2),
-                    benchmark.BenchVarValue(
-                        var_name='third_var', var_value=1.01),
-                ]),
-            outputs=benchmark.BenchOutputs(
-                runs=181651562, time=8.46, mem_used=0.0, mem_allocs=0),
-        ),
-    ]
 
     def test_get_var_names(self):
         my_bench = benchmark.Benchmark("BenchmarkMyMethod")
-        for bench_res in self.sample_bench_results:
+        for bench_res in list(sample_bench_results):
             my_bench.add_result(bench_res)
 
         expected_var_names = ["first_var", "second_var", "third_var"]
@@ -45,7 +46,7 @@ class TestBenchmark(unittest.TestCase):
 
     def test_get_subs(self):
         my_bench = benchmark.Benchmark("BenchmarkMyMethod")
-        for bench_res in self.sample_bench_results:
+        for bench_res in list(sample_bench_results):
             my_bench.add_result(bench_res)
 
         expected_subs = ["first_bench"]
@@ -53,7 +54,7 @@ class TestBenchmark(unittest.TestCase):
 
     def test_grouped_results(self):
         my_bench = benchmark.Benchmark("BenchmarkMyMethod")
-        for bench_res in self.sample_bench_results:
+        for bench_res in list(sample_bench_results):
             my_bench.add_result(bench_res)
 
         res = my_bench.grouped_results('first_var', subs=['first_bench'])
@@ -62,12 +63,37 @@ class TestBenchmark(unittest.TestCase):
             benchmark.BenchVarValue(var_name='first_var',
                                     var_value='some_name'),
         ])
-        group_res: benchmark.GroupedResults = self.sample_bench_results
-        expected_grouped_res: benchmark.GroupedResults = {
+        group_res: benchmark.GroupedResults = list(sample_bench_results)
+        expected_grouped_res = {
             group_vals: [group_res[0], group_res[1]],
         }
 
         self.assertEqual(expected_grouped_res, res)
+
+
+class TestGroupedResults(unittest.TestCase):
+    def test_split_to(self):
+        group_vals = benchmark.BenchVarValues([
+            benchmark.BenchVarValue(var_name='first_var',
+                                    var_value='some_name'),
+        ])
+        group_res: benchmark.GroupedResults = list(sample_bench_results)
+        grouped_res: benchmark.GroupedResults = benchmark.GroupedResults(initdata={
+            group_vals: [group_res[0], group_res[1]],
+        })
+
+        res = grouped_res.split_to('second_var', 'time')
+
+        expected_split_res = {
+            "first_var = some_name": [
+                benchmark.SplitRes(
+                    x=1, y=7.46),
+                benchmark.SplitRes(
+                    x=2, y=8.46),
+            ]
+        }
+
+        self.assertEqual(expected_split_res, res)
 
 
 class TestParseOutLine(unittest.TestCase):
