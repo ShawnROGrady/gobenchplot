@@ -26,12 +26,13 @@ def main() -> int:
         dest='x',
         nargs='?',
         help="the name of the x-axis variable (an input to the benchmark)")
+    available_y_vals = benchmark.BenchOutputs.__dict__['_fields']
     parser.add_argument(
         '--y',
         dest='y',
         nargs='?',
         default='time',
-        help="the name of the y-axis variable (one of: 'runs', 'time', 'mem_allocs', 'mem_used')")
+        help="the name of the y-axis variable (one of: %s)" % (', '.join(available_y_vals)))
     parser.add_argument(
         '--group-by',
         dest='group_by',
