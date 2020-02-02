@@ -24,7 +24,11 @@ def bench_res_data(bench_results: typing.List[benchmark.SplitRes]) -> PlotData:
 def plot_bench(bench: benchmark.Benchmark, group_by: typing.Union[typing.List[str], str], x_name: str, y_name: str = 'time', subs: typing.List = []):
     split_res = bench.split_to(x_name, y_name, group_by, subs)
 
-    plt.title(bench.name)
+    if len(subs) == 0:
+        plt.title(bench.name)
+    else:
+        plt.title("%s/%s" % (bench.name, "/".join(subs)))
+
     ax = plt.gca()
     for label, res in split_res.items():
         plot_data = bench_res_data(res)

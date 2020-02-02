@@ -36,8 +36,13 @@ def main() -> int:
     parser.add_argument(
         '--group-by',
         dest='group_by',
-        nargs='?',
+        nargs='+',
         help='the variables to group results by (an input to the benchmark)')
+    parser.add_argument(
+        '--subs',
+        dest='subs',
+        nargs='+',
+        help="the sub-benchmark(s) to plot")
 
     args = parser.parse_args()
 
@@ -56,7 +61,11 @@ def main() -> int:
             print("no bench '%s' found" % (args.bench), file=sys.stderr)
             return 1
 
-        plot_bench(bench, args.group_by, args.x, y_name=args.y)
+        if args.subs is not None:
+            plot_bench(bench, args.group_by, args.x,
+                       y_name=args.y, subs=args.subs)
+        else:
+            plot_bench(bench, args.group_by, args.x, y_name=args.y)
     else:
         # TODO: should just plot all benchmarks
         print("need to provide benchmark name", file=sys.stderr)

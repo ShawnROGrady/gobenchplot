@@ -102,11 +102,7 @@ class Benchmark:
     def split_to(self, x_name: str, y_name: str, group_by: typing.Union[typing.List[str], str], subs: typing.List[str] = []) -> typing.Dict[str, typing.List[SplitRes]]:
         if len(self._results) == 0:
             raise Exception("no results")
-        all_subs = self.get_subs()
-        if all_subs is not None and (len(subs) != len(all_subs)):
-            raise Exception(
-                "unexpected number of subs received (expected = %d, provided = %d)" % (len(all_subs), len(subs)))
-        # TODO: possibly raise exception if no subs present but provided
+        # TODO: validate subs
 
         all_var_names = self.get_var_names()
         if isinstance(group_by, typing.List):
