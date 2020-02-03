@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import typing
 import benchmark
+import inputs
 
 
 class PlotData(typing.NamedTuple):
@@ -59,17 +60,24 @@ def plot_bar(data: typing.Dict[str, PlotData]):
     ax.set_xticklabels(data.keys())
 
 
-def plot_data(data: typing.Dict[str, PlotData]):
+def plot_data(data: typing.Dict[str, PlotData], x_name: str, y_name: str = 'time'):
     x_type = list(data.values())[0].x_type()
     y_type = list(data.values())[0].y_type()
 
     if 'str' in y_type.name or 'bool' in y_type.name:
-        raise Exception("unsupported y-axis data type: %s" % (y_type.name))
+        raise inputs.InvalidInputError(
+            "unsupported data type '%s'" % (y_type.name),
+            inputs.Y_NAME,
+            input_val=y_name)
 
+    plt.xlabel(x_name)
+    plt.ylabel(y_name)
     if 'str' in x_type.name or 'bool' in x_type.name:
         plot_bar(data)
     else:
         plot_line(data)
+
+    plt.show()
 
 
 def plot_bench(bench: benchmark.Benchmark, group_by: typing.Union[typing.List[str], str], x_name: str, y_name: str = 'time', subs: typing.List = None, filter_vars: typing.List[str] = None):
@@ -84,7 +92,10 @@ def plot_bench(bench: benchmark.Benchmark, group_by: typing.Union[typing.List[st
         filtered = expr(filtered)
 
     if len(filtered) == 0:
-        raise Exception("no results to plot")
+        raise inputs.InvalidInputError(
+            "no results remain",
+            [inputs.FILTER_BY_NAME, inputs.SUBS_NAME],
+            [filter_vars, subs])
 
     split_res: benchmark.SplitResults = filtered.group_by(
         group_by).split_to(x_name, y_name)
@@ -93,9 +104,4 @@ def plot_bench(bench: benchmark.Benchmark, group_by: typing.Union[typing.List[st
     for label, res in split_res.items():
         data[label] = bench_res_data(res)
 
-    plt.xlabel(x_name)
-    plt.ylabel(y_name)
-
-    plot_data(data)
-
-    plt.show()
+    plot_data(data, x_name, y_name=y_name)

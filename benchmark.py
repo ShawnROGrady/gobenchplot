@@ -2,6 +2,7 @@ import typing
 import json
 from functools import singledispatch
 import re
+import inputs
 
 
 ResValue = typing.Union[int, str, float, bool]
@@ -133,8 +134,8 @@ class GroupedResults(dict):
                         break
 
                 if x_var is None:
-                    raise Exception(
-                        "%s is not a defined variable of the benchmark" % (x_name))
+                    raise inputs.InvalidInputError(
+                        'no variable with that name', inputs.X_NAME, input_val=x_name)
                 if not str(var_value) in split_results:
                     split_results[str(var_value)] = []
 
@@ -143,8 +144,8 @@ class GroupedResults(dict):
                     split_results[str(var_value)].append(
                         SplitRes(x=x_var.var_value, y=y_val))
                 except AttributeError:
-                    raise Exception(
-                        "%s is not a defined output of the benchmark" % (y_name))
+                    raise inputs.InvalidInputError(
+                        'no output with that name', inputs.Y_NAME, input_val=y_name)
         return split_results
 
 
@@ -225,14 +226,15 @@ class BenchResults:
         if isinstance(group_by, typing.List):
             for group_var_name in group_by:
                 if not group_var_name in all_var_names:
-                    raise Exception(
-                        "%s is not a defined variable of the benchmark" % (group_var_name))
+                    raise inputs.InvalidInputError(
+                        'no variable with that name', inputs.GROUP_BY_NAME, input_val=group_var_name)
         elif isinstance(group_by, str):
             if not group_by in all_var_names:
-                raise Exception(
-                    "%s is not a defined variable of the benchmark" % (group_by))
+                raise inputs.InvalidInputError(
+                    'no variable with that name', inputs.GROUP_BY_NAME, input_val=group_var_name)
         else:
-            raise Exception("invalid group_by = {}".format(group_by))
+            raise inputs.InvalidInputError(
+                'invalid type %s' % (type(group_by)), inputs.GROUP_BY_NAME, input_val=group_var_name)
 
         grouped_results: GroupedResults = GroupedResults()
 
@@ -262,12 +264,12 @@ class Benchmark:
 
     def get_var_names(self) -> typing.List[str]:
         if len(self._results) == 0:
-            raise Exception("no results")
+            return []
         return self._results.get_var_names()
 
     def get_subs(self) -> typing.Optional[typing.List[str]]:
         if len(self._results) == 0:
-            raise Exception("no results")
+            return None
         return self._results.get_subs()
 
     @property
@@ -278,7 +280,7 @@ class Benchmark:
             self,
             group_by: typing.Union[typing.List[str], str]) -> GroupedResults:
         if len(self._results) == 0:
-            raise Exception("no results")
+            return GroupedResults()
         return self._results.group_by(group_by)
 
 
@@ -315,8 +317,9 @@ def build_filter_exprs(
         for value in var_values:
             split_val = value.replace(" ", "").split("=")
             if len(split_val) != 2:
-                raise Exception(
-                    "var filter expected to be of form 'var_name=var_value', received: %s" % (value))
+                raise inputs.InvalidInputError(
+                    "not of expected form 'var_name=var_value'",
+                    inputs.FILTER_BY_NAME, input_val=value)
             var = BenchVarValue(
                 var_name=split_val[0], var_value=var_value(split_val[1]))
             exprs.append(filter_expr(var))
@@ -348,6 +351,14 @@ def var_value(parsed_val: str) -> ResValue:
         return parsed_val
 
 
+class ParseBenchmarkError(Exception):
+    def __init__(self, line: str, reason: str):
+        Exception.__init__(
+            self, "%s. Output line = %s" % (reason, line))
+        self.line = line
+        self.reason = reason
+
+
 def parse_out_line(line: str) -> typing.Optional[
         typing.Union[BenchInfo, BenchOutputs]]:
     bench_line = json.loads(line)
@@ -359,7 +370,8 @@ def parse_out_line(line: str) -> typing.Optional[
         # BenchInfo
         m = bench_info_expr.match(output_info)
         if not m:
-            raise Exception("unexpected bench info")
+            raise ParseBenchmarkError(
+                line, "line didn't match regular expression %s" % (bench_info_expr))
 
         full_name = m[1]
         name: str = ''
@@ -409,7 +421,8 @@ def parse_out_line(line: str) -> typing.Optional[
             return BenchOutputs(
                 runs=runs, time=time, mem_allocs=mem_allocs, mem_used=mem_used)
         else:
-            raise Exception("no time found")
+            raise ParseBenchmarkError(
+                line, "no time found in benchmark output")
 
     return None
 
