@@ -1,4 +1,10 @@
 /__pycache__/
 */__pycache__/
-/backups/
 .mypy_cache/
+
+# dir holding saved 'go test' outputs for testing
+/backups/
+
+# ignore code coverage stuff
+htmlcov/
+.coverage
