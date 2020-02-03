@@ -17,7 +17,3 @@ class TestBenchResData(unittest.TestCase):
         expected_plot_data = plot.PlotData(
             x=np.array([1, 2]),
             y=np.array([7.46, 8.46]))
-
-
-if __name__ == '__main__':
-    unittest.main()

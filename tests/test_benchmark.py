@@ -458,7 +458,3 @@ class TestBenchSuite(unittest.TestCase):
 
         bench = suite.get_benchmark(bench_name)
         self.assertIsNotNone(bench)
-
-
-if __name__ == '__main__':
-    unittest.main()
