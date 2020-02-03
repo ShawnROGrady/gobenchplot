@@ -338,6 +338,48 @@ class TestFilterResults(unittest.TestCase):
                 self.assertEqual(test_case.expected_filtered, filtered)
 
 
+class TestVarValue(unittest.TestCase):
+    def test_int(self):
+        parsed_vals = ['1', '2', '0', '-1', '100']
+        expected_vals = [1, 2, 0, -1, 100]
+
+        for i, parsed_val in enumerate(parsed_vals):
+            with self.subTest(parsed_val):
+                val = benchmark.var_value(parsed_val)
+                self.assertIsInstance(val, int)
+                self.assertEqual(expected_vals[i], val)
+
+    def test_str(self):
+        parsed_vals = ['hello', '12h34m', '_', '', ' ']
+        expected_vals = ['hello', '12h34m', '_', '', ' ']
+
+        for i, parsed_val in enumerate(parsed_vals):
+            with self.subTest(parsed_val):
+                val = benchmark.var_value(parsed_val)
+                self.assertIsInstance(val, str)
+                self.assertEqual(expected_vals[i], val)
+
+    def test_float(self):
+        parsed_vals = ['1.0', '2.2', '0.000', '-1.1', '100.2', '.2']
+        expected_vals = [1.0, 2.2, 0.000, -1.1, 100.2, 0.2]
+
+        for i, parsed_val in enumerate(parsed_vals):
+            with self.subTest(parsed_val):
+                val = benchmark.var_value(parsed_val)
+                self.assertIsInstance(val, float)
+                self.assertEqual(expected_vals[i], val)
+
+    def test_bool(self):
+        parsed_vals = ['true', 'TRUE', 'True', 'false', 'FALSE', 'false']
+        expected_vals = [True, True, True, False, False, False]
+
+        for i, parsed_val in enumerate(parsed_vals):
+            with self.subTest(parsed_val):
+                val = benchmark.var_value(parsed_val)
+                self.assertIsInstance(val, bool)
+                self.assertEqual(expected_vals[i], val)
+
+
 class TestParseOutLine(unittest.TestCase):
     def test_bench_info(self):
         input_line = r'{"Time":"2020-01-30T12:53:44.276751-06:00","Action":"output","Package":"github.com/SomeUser/somepkg","Output":"BenchmarkMyMethod/some_case/first_var=some_name/second_var=1/third_var=1.00-4         \t"}'

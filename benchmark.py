@@ -4,12 +4,12 @@ from functools import singledispatch
 import re
 
 
-ResValue = typing.Union[int, str, float]
+ResValue = typing.Union[int, str, float, bool]
 
 
 class BenchVarValue(typing.NamedTuple):
     var_name: str
-    var_value: typing.Union[int, str, float]
+    var_value: ResValue
 
     def __str__(self):
         return "{} = {}".format(self.var_name, self.var_value)
@@ -331,16 +331,21 @@ class BenchInfo(typing.NamedTuple):
     inputs: BenchInputs
 
 
-def var_value(parsed_val: str) -> typing.Union[str, int, float]:
-    try:
-        int_val = int(parsed_val)
-        return int_val
-    except ValueError:
+def var_value(parsed_val: str) -> ResValue:
+    possible_types = [int, float]
+    for _type in possible_types:
         try:
-            float_val = float(parsed_val)
-            return float_val
+            res_value = _type(parsed_val)
+            return res_value
         except ValueError:
-            return parsed_val
+            continue
+    normalized = parsed_val.lower().replace(" ", "")
+    if normalized == "true":
+        return True
+    elif normalized == "false":
+        return False
+    else:
+        return parsed_val
 
 
 def parse_out_line(line: str) -> typing.Optional[
