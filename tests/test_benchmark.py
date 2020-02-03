@@ -1,5 +1,6 @@
 import copy
 import benchmark
+import inputs
 import functools
 import unittest
 import collections
@@ -47,30 +48,147 @@ class TestBenchmark(unittest.TestCase):
         self.assertEqual(expected_var_names, my_bench.get_var_names())
 
     def test_get_subs(self):
-        my_bench = benchmark.Benchmark("BenchmarkMyMethod")
-        for bench_res in list(sample_bench_results):
-            my_bench.add_result(bench_res)
+        # my_bench = benchmark.Benchmark("BenchmarkMyMethod")
+        # for bench_res in list(sample_bench_results):
+        #     my_bench.add_result(bench_res)
 
-        expected_subs = ["first_bench"]
-        self.assertEqual(expected_subs, my_bench.get_subs())
+        # expected_subs = ["first_bench"]
+        # self.assertEqual(expected_subs, my_bench.get_subs())
+        TestCase = collections.namedtuple(
+            'TestCase', 'results expected_subs')
+        test_cases = {
+            'one_sub': TestCase(
+                results=list(sample_bench_results),
+                expected_subs=["first_bench"]),
+            'two_subs': TestCase(
+                results=[
+                    benchmark.BenchRes(
+                        inputs=benchmark.BenchInputs(
+                            subs=["first_bench", "second_bench"],
+                            variables=[
+                                benchmark.BenchVarValue(var_name='first_var',
+                                                        var_value='some_name'),
+                            ]),
+                        outputs=benchmark.BenchOutputs(
+                            runs=161651562, time=7.46, mem_used=0.0, mem_allocs=0),
+                    ),
+                    benchmark.BenchRes(
+                        inputs=benchmark.BenchInputs(
+                            subs=["first_bench", "second_bench"],
+                            variables=[
+                                benchmark.BenchVarValue(var_name='first_var',
+                                                        var_value='some_name'),
+                            ]),
+                        outputs=benchmark.BenchOutputs(
+                            runs=181651562, time=8.46, mem_used=0.0, mem_allocs=0),
+                    ),
+                ],
+                expected_subs=["first_bench", "second_bench"]),
+            'no_subs': TestCase(
+                results=[
+                    benchmark.BenchRes(
+                        inputs=benchmark.BenchInputs(
+                            subs=None,
+                            variables=[
+                                benchmark.BenchVarValue(var_name='first_var',
+                                                        var_value='some_name'),
+                            ]),
+                        outputs=benchmark.BenchOutputs(
+                            runs=161651562, time=7.46, mem_used=0.0, mem_allocs=0),
+                    ),
+                    benchmark.BenchRes(
+                        inputs=benchmark.BenchInputs(
+                            subs=None,
+                            variables=[
+                                benchmark.BenchVarValue(var_name='first_var',
+                                                        var_value='some_name'),
+                            ]),
+                        outputs=benchmark.BenchOutputs(
+                            runs=181651562, time=8.46, mem_used=0.0, mem_allocs=0),
+                    ),
+                ],
+                expected_subs=None),
+        }
+        for test_name, test_case in test_cases.items():
+            with self.subTest(test_name):
+                my_bench = benchmark.Benchmark("BenchmarkMyMethod")
+                for bench_res in list(test_case.results):
+                    my_bench.add_result(bench_res)
+                self.assertEqual(test_case.expected_subs, my_bench.get_subs())
 
     def test_grouped_results(self):
-        my_bench = benchmark.Benchmark("BenchmarkMyMethod")
-        for bench_res in list(sample_bench_results):
-            my_bench.add_result(bench_res)
-
-        res = my_bench.grouped_results('first_var')
-
-        group_vals = benchmark.BenchVarValues([
-            benchmark.BenchVarValue(var_name='first_var',
-                                    var_value='some_name'),
-        ])
         group_res: benchmark.GroupedResults = list(sample_bench_results)
-        expected_grouped_res = {
-            group_vals: [group_res[0], group_res[1]],
+        TestCase = collections.namedtuple(
+            'TestCase', 'results group_by expected_grouped_res')
+        test_cases = {
+            'no_initial_results': TestCase(
+                results=[],
+                group_by='first_var',
+                expected_grouped_res={}),
+            'valid_single_var': TestCase(
+                results=list(sample_bench_results),
+                group_by='first_var',
+                expected_grouped_res={
+                    benchmark.BenchVarValues(
+                        [benchmark.BenchVarValue(
+                            var_name='first_var', var_value='some_name')],
+                    ): [group_res[0], group_res[1]],
+                }),
+            '2_valid_vars': TestCase(
+                results=list(sample_bench_results),
+                group_by=['first_var', 'second_var'],
+                expected_grouped_res={
+                    benchmark.BenchVarValues(
+                        [
+                            benchmark.BenchVarValue(
+                                var_name='first_var', var_value='some_name'),
+                            benchmark.BenchVarValue(
+                                var_name='second_var', var_value=1),
+                        ],
+                    ): [group_res[0]],
+                    benchmark.BenchVarValues(
+                        [
+                            benchmark.BenchVarValue(
+                                var_name='first_var', var_value='some_name'),
+                            benchmark.BenchVarValue(
+                                var_name='second_var', var_value=2),
+                        ],
+                    ): [group_res[1]],
+                }),
         }
+        for test_name, test_case in test_cases.items():
+            with self.subTest(test_name):
+                my_bench = benchmark.Benchmark("BenchmarkMyMethod")
+                for bench_res in test_case.results:
+                    my_bench.add_result(bench_res)
+                res = my_bench.grouped_results(test_case.group_by)
+                self.assertEqual(test_case.expected_grouped_res, res)
 
-        self.assertEqual(expected_grouped_res, res)
+    def test_grouped_results_raises(self):
+        TestCase = collections.namedtuple(
+            'TestCase', 'results group_by expected_err_type')
+
+        test_cases = {
+            'group_by_invalid_str': TestCase(
+                results=list(sample_bench_results),
+                group_by='fourth_var',
+                expected_err_type=inputs.InvalidInputError),
+            'group_by_invalid_list': TestCase(
+                results=list(sample_bench_results),
+                group_by=['fourth_var'],
+                expected_err_type=inputs.InvalidInputError),
+            'group_by_int': TestCase(
+                results=list(sample_bench_results),
+                group_by=1,
+                expected_err_type=inputs.InvalidInputError),
+        }
+        for test_name, test_case in test_cases.items():
+            with self.subTest(test_name):
+                my_bench = benchmark.Benchmark("BenchmarkMyMethod")
+                for bench_res in test_case.results:
+                    my_bench.add_result(bench_res)
+                with self.assertRaises(test_case.expected_err_type):
+                    grouped_res = my_bench.grouped_results(test_case.group_by)
 
 
 class TestGroupedResults(unittest.TestCase):
@@ -96,6 +214,39 @@ class TestGroupedResults(unittest.TestCase):
         }
 
         self.assertEqual(expected_split_res, res)
+
+    def test_split_to_raises(self):
+        TestCase = collections.namedtuple(
+            'TestCase', 'grouped_results x_name y_name expected_err_type')
+        test_cases = {
+            'invalid_x_name': TestCase(
+                grouped_results={
+                    benchmark.BenchVarValues([
+                        benchmark.BenchVarValue(var_name='first_var',
+                                                var_value='some_name'),
+                    ]): list(sample_bench_results),
+                },
+                x_name='fake_var',
+                y_name='time',
+                expected_err_type=inputs.InvalidInputError),
+            'invalid_y_name': TestCase(
+                grouped_results={
+                    benchmark.BenchVarValues([
+                        benchmark.BenchVarValue(var_name='first_var',
+                                                var_value='some_name'),
+                    ]): list(sample_bench_results),
+                },
+                x_name='first_var',
+                y_name='fake_output',
+                expected_err_type=inputs.InvalidInputError),
+        }
+        for test_name, test_case in test_cases.items():
+            with self.subTest(test_name):
+                grouped_res: benchmark.GroupedResults = benchmark.GroupedResults(
+                    initdata=test_case.grouped_results)
+                with self.assertRaises(test_case.expected_err_type):
+                    res = grouped_res.split_to(
+                        test_case.x_name, test_case.y_name)
 
     def test_filtered_by_subs(self):
         group_vals = benchmark.BenchVarValues([
@@ -212,6 +363,11 @@ class TestFilterResults(unittest.TestCase):
                     [self.group_res[0], self.group_res[1]])}),
                 filter_exprs=[benchmark.filter_expr(['first_bench'])],
                 expected_filtered={self.group_vals: [self.group_res[0], self.group_res[1]]}),
+            'filter_by_int': self.TestCase(
+                initial_res=benchmark.GroupedResults(initdata={self.group_vals: benchmark.BenchResults(
+                    [self.group_res[0], self.group_res[1]])}),
+                filter_exprs=[benchmark.filter_expr(1)],
+                expected_filtered={self.group_vals: [self.group_res[0], self.group_res[1]]}),
             'valid_filter_by_subs': self.TestCase(
                 initial_res=benchmark.GroupedResults(initdata={self.group_vals: benchmark.BenchResults(
                     [self.group_res[0], self.group_res[1], self.group_res[2]])}),
@@ -225,6 +381,13 @@ class TestFilterResults(unittest.TestCase):
                     benchmark.filter_expr(benchmark.BenchVarValue(var_name='second_var',
                                                                   var_value=2)),
                 ],
+                expected_filtered={self.group_vals: [self.group_res[1]]}),
+            'valid_filter_by_subs_and_vars_with_builder': self.TestCase(
+                initial_res=benchmark.GroupedResults(initdata={self.group_vals: benchmark.BenchResults(
+                    [self.group_res[0], self.group_res[1], self.group_res[2]])}),
+                filter_exprs=benchmark.build_filter_exprs(
+                    ['first_bench'],
+                    ['second_var=2', 'first_var=some_name']),
                 expected_filtered={self.group_vals: [self.group_res[1]]}),
             'valid_filter_by_subs': self.TestCase(
                 initial_res=benchmark.GroupedResults(initdata={self.group_vals: benchmark.BenchResults(
@@ -271,12 +434,35 @@ class TestFilterResults(unittest.TestCase):
                     filtered = expr(filtered)
                 self.assertEqual(test_case.expected_filtered, filtered)
 
+    def test_build_filter_exprs_raises(self):
+        RaisesTestCase = collections.namedtuple(
+            'RaisesTestCase', 'initial_res subs var_values expected_err_type')
+
+        test_cases = {
+            'invalid_var_value': RaisesTestCase(
+                initial_res=benchmark.GroupedResults(initdata={self.group_vals: benchmark.BenchResults(
+                    [self.group_res[0], self.group_res[1]])}),
+                subs=None, var_values=['first_var-some_value'],
+                expected_err_type=inputs.InvalidInputError),
+        }
+        for test_name, test_case in test_cases.items():
+            with self.subTest(test_name):
+                filtered = copy.deepcopy(test_case.initial_res)
+                with self.assertRaises(test_case.expected_err_type):
+                    exprs = benchmark.build_filter_exprs(
+                        test_case.subs, test_case.var_values)
+
     def test_filter_bench_results(self):
         test_cases = {
             'already_filtered_by_subs': self.TestCase(
                 initial_res=benchmark.BenchResults(
                     [self.group_res[0], self.group_res[1]]),
                 filter_exprs=[benchmark.filter_expr(['first_bench'])],
+                expected_filtered=[self.group_res[0], self.group_res[1]]),
+            'filter_by_int': self.TestCase(
+                initial_res=benchmark.BenchResults(
+                    [self.group_res[0], self.group_res[1]]),
+                filter_exprs=[benchmark.filter_expr(1)],
                 expected_filtered=[self.group_res[0], self.group_res[1]]),
             'valid_filter_by_subs': self.TestCase(
                 initial_res=benchmark.BenchResults(
@@ -291,6 +477,13 @@ class TestFilterResults(unittest.TestCase):
                     benchmark.filter_expr(benchmark.BenchVarValue(var_name='second_var',
                                                                   var_value=2)),
                 ],
+                expected_filtered=[self.group_res[1]]),
+            'valid_filter_by_subs_and_vars_with_builder': self.TestCase(
+                initial_res=benchmark.BenchResults(
+                    [self.group_res[0], self.group_res[1], self.group_res[2]]),
+                filter_exprs=benchmark.build_filter_exprs(
+                    ['first_bench'],
+                    ['second_var=2', 'first_var=some_name']),
                 expected_filtered=[self.group_res[1]]),
             'valid_filter_by_subs': self.TestCase(
                 initial_res=benchmark.BenchResults(
@@ -382,22 +575,43 @@ class TestVarValue(unittest.TestCase):
 
 class TestParseOutLine(unittest.TestCase):
     def test_bench_info(self):
-        input_line = r'{"Time":"2020-01-30T12:53:44.276751-06:00","Action":"output","Package":"github.com/SomeUser/somepkg","Output":"BenchmarkMyMethod/some_case/first_var=some_name/second_var=1/third_var=1.00-4         \t"}'
-        parsed = benchmark.parse_out_line(input_line)
-        self.assertIsInstance(parsed, benchmark.BenchInfo,
-                              "unexpected return type")
-        self.assertEqual("BenchmarkMyMethod", parsed.name, "unexpected name")
-        self.assertEqual(
-            ["some_case"], parsed.inputs.subs, "unexpected subs")
-        self.assertEqual(
-            [
-                benchmark.BenchVarValue(var_name='first_var',
-                                        var_value='some_name'),
-                benchmark.BenchVarValue(var_name='second_var', var_value=1),
-                benchmark.BenchVarValue(var_name='third_var', var_value=1.00),
-            ],
-            parsed.inputs.variables,
-            "unexpected variable values")
+        TestCase = collections.namedtuple(
+            'TestCase', 'input_line expected_name expected_vars expected_subs')
+
+        test_cases = {
+            'standard_info_line': TestCase(
+                input_line=r'{"Time":"2020-01-30T12:53:44.276751-06:00","Action":"output","Package":"github.com/SomeUser/somepkg","Output":"BenchmarkMyMethod/some_case/first_var=some_name/second_var=1/third_var=1.00-4         \t"}',
+                expected_name='BenchmarkMyMethod',
+                expected_vars=[
+                    benchmark.BenchVarValue(var_name='first_var',
+                                            var_value='some_name'),
+                    benchmark.BenchVarValue(
+                        var_name='second_var', var_value=1),
+                    benchmark.BenchVarValue(
+                        var_name='third_var', var_value=1.00),
+                ],
+                expected_subs=['some_case']),
+            'multiple_subs': TestCase(
+                input_line=r'{"Time":"2020-01-30T12:53:44.276751-06:00","Action":"output","Package":"github.com/SomeUser/somepkg","Output":"BenchmarkMyMethod/some_case/first_var=some_name/another_case/second_var=1/third_var=1.00-4         \t"}',
+                expected_name='BenchmarkMyMethod',
+                expected_vars=[
+                    benchmark.BenchVarValue(var_name='first_var',
+                                            var_value='some_name'),
+                    benchmark.BenchVarValue(
+                        var_name='second_var', var_value=1),
+                    benchmark.BenchVarValue(
+                        var_name='third_var', var_value=1.00),
+                ],
+                expected_subs=['some_case', 'another_case']),
+        }
+        for test_name, test_case in test_cases.items():
+            with self.subTest(test_name):
+                parsed = benchmark.parse_out_line(test_case.input_line)
+                self.assertIsInstance(parsed, benchmark.BenchInfo,
+                                      "unexpected return type")
+                self.assertEqual(test_case.expected_vars,
+                                 parsed.inputs.variables)
+                self.assertEqual(test_case.expected_subs, parsed.inputs.subs)
 
     def test_bench_outputs(self):
         TestCase = collections.namedtuple(
@@ -442,12 +656,32 @@ class TestParseOutLine(unittest.TestCase):
         parsed = benchmark.parse_out_line(input_line)
         self.assertIsNone(parsed)
 
+    def test_raises(self):
+        TestCase = collections.namedtuple(
+            'TestCase', 'input_line expected_err_type')
+        test_cases = {
+            'invalid_info_expression': TestCase(
+                input_line=r'{"Time":"2020-01-30T12:53:44.276751-06:00","Action":"output","Package":"github.com/SomeUser/somepkg","Output":"BenchmarkMyMethod_abc"}',
+                expected_err_type=benchmark.ParseBenchmarkError),
+            'output_missing_time': TestCase(
+                input_line=r'{"Time":"2020-01-30T17:14:23.859509-06:00","Action":"output","Package":"github.com/SomeUser/somepkg","Output":"161651562\t         0 B/op\t       0 allocs/op\n"}',
+                expected_err_type=benchmark.ParseBenchmarkError),
+        }
+
+        for test_name, test_case in test_cases.items():
+            with self.subTest(test_name):
+                with self.assertRaises(test_case.expected_err_type):
+                    parsed = benchmark.parse_out_line(test_case.input_line)
+
 
 class TestBenchSuite(unittest.TestCase):
     def test_readline(self):
         input_lines = [
+            r'{"Time":"2020-01-30T17:14:21.904978-06:00","Action":"output","Package":"github.com/SomeUser/somepkg","Output":"pkg: github.com/SomeUser/somepkg\n"}',
             r'{"Time":"2020-01-30T12:53:44.276751-06:00","Action":"output","Package":"github.com/SomeUser/somepkg","Output":"BenchmarkMyMethod/some_case/first_var=some_name/second_var=1/third_var=1.00-4         \t"}',
             r'{"Time":"2020-01-30T17:14:23.859509-06:00","Action":"output","Package":"github.com/SomeUser/somepkg","Output":"161651562\t         7.46 ns/op\t       0 B/op\t       0 allocs/op\n"}',
+            r'{"Time":"2020-01-30T12:53:44.276751-06:00","Action":"output","Package":"github.com/SomeUser/somepkg","Output":"BenchmarkMyMethod/some_case/first_var=some_name/second_var=2/third_var=1.01-4         \t"}',
+            r'{"Time":"2020-01-30T17:14:23.859509-06:00","Action":"output","Package":"github.com/SomeUser/somepkg","Output":"161651562\t         8.46 ns/op\t       0 B/op\t       0 allocs/op\n"}',
         ]
 
         bench_name = "BenchmarkMyMethod"
@@ -458,3 +692,31 @@ class TestBenchSuite(unittest.TestCase):
 
         bench = suite.get_benchmark(bench_name)
         self.assertIsNotNone(bench)
+
+        benches = suite.get_benchmarks()
+        self.assertEqual(1, len(benches))
+
+    def test_readline_raises(self):
+        TestCase = collections.namedtuple(
+            'TestCase', 'input_lines expected_err_type')
+        test_cases = {
+            'output_missing_time': TestCase(
+                input_lines=[
+                    r'{"Time":"2020-01-30T12:53:44.276751-06:00","Action":"output","Package":"github.com/SomeUser/somepkg","Output":"BenchmarkMyMethod/some_case/first_var=some_name/second_var=1/third_var=1.00-4         \t"}',
+                    r'{"Time":"2020-01-30T17:14:23.859509-06:00","Action":"output","Package":"github.com/SomeUser/somepkg","Output":"161651562\t         0 B/op\t       0 allocs/op\n"}',
+                ],
+                expected_err_type=benchmark.ParseBenchmarkError),
+            'info_output_swapped': TestCase(
+                input_lines=[
+                    r'{"Time":"2020-01-30T17:14:23.859509-06:00","Action":"output","Package":"github.com/SomeUser/somepkg","Output":"161651562\t         7.46 ns/op\t       0 B/op\t       0 allocs/op\n"}',
+                    r'{"Time":"2020-01-30T12:53:44.276751-06:00","Action":"output","Package":"github.com/SomeUser/somepkg","Output":"BenchmarkMyMethod/some_case/first_var=some_name/second_var=1/third_var=1.00-4         \t"}',
+                ],
+                expected_err_type=benchmark.ParseBenchmarkError),
+        }
+
+        for test_name, test_case in test_cases.items():
+            with self.subTest(test_name):
+                with self.assertRaises(test_case.expected_err_type):
+                    suite = benchmark.BenchSuite()
+                    for line in test_case.input_lines:
+                        suite.readline(line)

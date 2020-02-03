@@ -231,10 +231,10 @@ class BenchResults:
         elif isinstance(group_by, str):
             if not group_by in all_var_names:
                 raise inputs.InvalidInputError(
-                    'no variable with that name', inputs.GROUP_BY_NAME, input_val=group_var_name)
+                    'no variable with that name', inputs.GROUP_BY_NAME, input_val=group_by)
         else:
             raise inputs.InvalidInputError(
-                'invalid type %s' % (type(group_by)), inputs.GROUP_BY_NAME, input_val=group_var_name)
+                'invalid type %s' % (type(group_by)), inputs.GROUP_BY_NAME, input_val=group_by)
 
         grouped_results: GroupedResults = GroupedResults()
 
@@ -441,7 +441,9 @@ class BenchSuite:
             return
         if isinstance(res, BenchOutputs):
             if self._current_bench is None:
-                raise Exception("bench outputs provided before bench info")
+                raise ParseBenchmarkError(
+                    line,
+                    "bench outputs provided before bench info")
 
             existing_bench = self.get_benchmark(self._current_bench.name)
             if existing_bench:
