@@ -48,12 +48,6 @@ class TestBenchmark(unittest.TestCase):
         self.assertEqual(expected_var_names, my_bench.get_var_names())
 
     def test_get_subs(self):
-        # my_bench = benchmark.Benchmark("BenchmarkMyMethod")
-        # for bench_res in list(sample_bench_results):
-        #     my_bench.add_result(bench_res)
-
-        # expected_subs = ["first_bench"]
-        # self.assertEqual(expected_subs, my_bench.get_subs())
         TestCase = collections.namedtuple(
             'TestCase', 'results expected_subs')
         test_cases = {
@@ -161,7 +155,7 @@ class TestBenchmark(unittest.TestCase):
                 my_bench = benchmark.Benchmark("BenchmarkMyMethod")
                 for bench_res in test_case.results:
                     my_bench.add_result(bench_res)
-                res = my_bench.grouped_results(test_case.group_by)
+                res = my_bench.results.group_by(test_case.group_by)
                 self.assertEqual(test_case.expected_grouped_res, res)
 
     def test_grouped_results_raises(self):
@@ -188,7 +182,8 @@ class TestBenchmark(unittest.TestCase):
                 for bench_res in test_case.results:
                     my_bench.add_result(bench_res)
                 with self.assertRaises(test_case.expected_err_type):
-                    grouped_res = my_bench.grouped_results(test_case.group_by)
+                    grouped_res = my_bench.results.group_by(
+                        test_case.group_by)
 
 
 class TestGroupedResults(unittest.TestCase):

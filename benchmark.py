@@ -222,6 +222,9 @@ class BenchResults:
             self,
             group_by: typing.Union[typing.List[str], str]) -> GroupedResults:
         all_var_names = self.get_var_names()
+        if len(self._data) == 0:
+            return GroupedResults()
+
         # TODO: validate subs
         if isinstance(group_by, typing.List):
             for group_var_name in group_by:
@@ -263,25 +266,14 @@ class Benchmark:
         self._results.append(result)
 
     def get_var_names(self) -> typing.List[str]:
-        if len(self._results) == 0:
-            return []
         return self._results.get_var_names()
 
     def get_subs(self) -> typing.Optional[typing.List[str]]:
-        if len(self._results) == 0:
-            return None
         return self._results.get_subs()
 
     @property
     def results(self) -> BenchResults:
         return self._results
-
-    def grouped_results(
-            self,
-            group_by: typing.Union[typing.List[str], str]) -> GroupedResults:
-        if len(self._results) == 0:
-            return GroupedResults()
-        return self._results.group_by(group_by)
 
 
 @singledispatch
