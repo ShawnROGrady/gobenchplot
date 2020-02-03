@@ -174,9 +174,6 @@ class BenchResults:
     def __delitem__(self, key: int):
         self._data.__delitem__(key)
 
-    def list(self) -> typing.List[BenchRes]:
-        return self._data
-
     def __eq__(self, other) -> bool:
         if isinstance(other, list):
             return other == self._data

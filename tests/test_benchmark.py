@@ -37,8 +37,68 @@ sample_bench_results = (
 )
 
 
-class TestBenchmark(unittest.TestCase):
+class TestBenchVarValue(unittest.TestCase):
+    def test_eq(self):
+        TestCase = collections.namedtuple(
+            'TestCase', 'a b expect_eq')
+        test_cases = {
+            'equal_var_values': TestCase(
+                a=benchmark.BenchVarValue(var_name='a', var_value=1),
+                b=benchmark.BenchVarValue(var_name='a', var_value=1),
+                expect_eq=True),
+            'nonequal_var_values': TestCase(
+                a=benchmark.BenchVarValue(var_name='a', var_value=1),
+                b=benchmark.BenchVarValue(var_name='b', var_value=1),
+                expect_eq=False),
+            'a=None': TestCase(
+                a=None,
+                b=benchmark.BenchVarValue(var_name='b', var_value=1),
+                expect_eq=False),
+            'b=int': TestCase(
+                a=benchmark.BenchVarValue(var_name='a', var_value=1),
+                b=1,
+                expect_eq=False),
+        }
+        for test_name, test_case in test_cases.items():
+            with self.subTest(test_name):
+                is_eq = test_case.a == test_case.b
+                self.assertEqual(test_case.expect_eq, is_eq)
 
+
+class TestBenchVarValues(unittest.TestCase):
+    def test_contains(self):
+        TestCase = collections.namedtuple(
+            'TestCase', 'values other expect_in')
+        test_cases = {
+            'contains': TestCase(
+                values=benchmark.BenchVarValues([
+                    benchmark.BenchVarValue(var_name='a', var_value=1),
+                    benchmark.BenchVarValue(var_name='b', var_value=2),
+                ]),
+                other=benchmark.BenchVarValue(var_name='a', var_value=1),
+                expect_in=True),
+            'not_contains': TestCase(
+                values=benchmark.BenchVarValues([
+                    benchmark.BenchVarValue(var_name='a', var_value=1),
+                    benchmark.BenchVarValue(var_name='b', var_value=2),
+                ]),
+                other=benchmark.BenchVarValue(var_name='a', var_value=2),
+                expect_in=False),
+            'other=int': TestCase(
+                values=benchmark.BenchVarValues([
+                    benchmark.BenchVarValue(var_name='a', var_value=1),
+                    benchmark.BenchVarValue(var_name='b', var_value=2),
+                ]),
+                other=1,
+                expect_in=False),
+        }
+        for test_name, test_case in test_cases.items():
+            with self.subTest(test_name):
+                is_in = test_case.other in test_case.values
+                self.assertEqual(test_case.expect_in, is_in)
+
+
+class TestBenchmark(unittest.TestCase):
     def test_get_var_names(self):
         my_bench = benchmark.Benchmark("BenchmarkMyMethod")
         for bench_res in list(sample_bench_results):
@@ -325,6 +385,157 @@ class TestGroupedResults(unittest.TestCase):
                     initdata=test_case.initdata)
                 filtered = grouped_res.filtered_by_var_value(test_case.value)
                 self.assertEqual(test_case.expected_filtered, filtered)
+
+    def test_update(self):
+        group_vals = benchmark.BenchVarValues([
+            benchmark.BenchVarValue(var_name='first_var',
+                                    var_value='some_name'),
+        ])
+        group_res: benchmark.GroupedResults = list(sample_bench_results)
+
+        new_vals = benchmark.BenchVarValues([
+            benchmark.BenchVarValue(var_name='first_var',
+                                    var_value='another_name'),
+        ])
+        new_res = benchmark.BenchRes(
+            inputs=benchmark.BenchInputs(
+                subs=["second_bench"],
+                variables=[
+                    benchmark.BenchVarValue(var_name='first_var',
+                                            var_value='some_name'),
+                    benchmark.BenchVarValue(
+                        var_name='second_var', var_value=2),
+                    benchmark.BenchVarValue(
+                        var_name='third_var', var_value=1.02),
+                ]),
+            outputs=benchmark.BenchOutputs(
+                runs=191651562, time=8.46, mem_used=0.0, mem_allocs=0),
+        )
+
+        TestCase = collections.namedtuple(
+            'TestCase', 'initdata arg expected_updated')
+        test_cases = {
+            'additive_update': TestCase(
+                initdata={group_vals: benchmark.BenchResults(
+                    [group_res[0], group_res[1]])},
+                arg={new_vals: benchmark.BenchResults([
+                    new_res])},
+                expected_updated={
+                    group_vals: benchmark.BenchResults(
+                        [group_res[0], group_res[1]]),
+                    new_vals: benchmark.BenchResults(
+                        [new_res]),
+                },
+            ),
+            'replacing_update': TestCase(
+                initdata={group_vals: benchmark.BenchResults(
+                    [group_res[0], group_res[1]])},
+                arg={group_vals: benchmark.BenchResults([
+                    new_res])},
+                expected_updated={
+                    group_vals: benchmark.BenchResults(
+                        [new_res]),
+                },
+            ),
+        }
+        for test_name, test_case in test_cases.items():
+            with self.subTest(test_name):
+                grouped_res: benchmark.GroupedResults = benchmark.GroupedResults(
+                    initdata=test_case.initdata)
+                grouped_res.update(test_case.arg)
+                self.assertEqual(test_case.expected_updated, grouped_res)
+
+
+class TestBenchResults(unittest.TestCase):
+    new_res = benchmark.BenchRes(
+        inputs=benchmark.BenchInputs(
+            subs=["second_bench"],
+            variables=[
+                benchmark.BenchVarValue(var_name='first_var',
+                                        var_value='some_name'),
+                benchmark.BenchVarValue(
+                    var_name='second_var', var_value=2),
+                benchmark.BenchVarValue(
+                    var_name='third_var', var_value=1.02),
+            ]),
+        outputs=benchmark.BenchOutputs(
+            runs=191651562, time=8.46, mem_used=0.0, mem_allocs=0),
+    )
+
+    # helper
+    def init_res(self):
+        initdata = copy.copy(list(sample_bench_results))
+        results = benchmark.BenchResults(initdata)
+
+        return results
+
+    def test_get_item(self):
+        results = self.init_res()
+
+        self.assertEqual(sample_bench_results[0], results[0])
+        self.assertEqual(sample_bench_results[1], results[1])
+
+    def test_set_item(self):
+        results = self.init_res()
+
+        results[0] = self.new_res
+        self.assertEqual(self.new_res, results[0])
+        self.assertEqual(sample_bench_results[1], results[1])
+
+    def test_contains(self):
+        results = self.init_res()
+
+        self.assertTrue(sample_bench_results[0] in results)
+
+    def test_append(self):
+        results = self.init_res()
+
+        results.append(self.new_res)
+        self.assertEqual(self.new_res, results[2])
+
+    def test_delete(self):
+        results = self.init_res()
+
+        del results[0]
+        self.assertEqual(1, len(results))
+        self.assertFalse(sample_bench_results[0] in results)
+
+    def test_list(self):
+        results = self.init_res()
+
+        self.assertEqual(list(results), list(sample_bench_results))
+
+    def test_eq(self):
+        TestCase = collections.namedtuple(
+            'TestCase', 'a b expect_eq')
+
+        test_cases = {
+            'eq_bench_results': TestCase(
+                a=self.init_res(),
+                b=self.init_res(),
+                expect_eq=True),
+            'eq_bench_results+list': TestCase(
+                a=self.init_res(),
+                b=list(sample_bench_results),
+                expect_eq=True),
+            'non_eq_bench_results': TestCase(
+                a=self.init_res(),
+                b=benchmark.BenchResults([self.new_res]),
+                expect_eq=False),
+            'non_eq_bench_results+list': TestCase(
+                a=self.init_res(),
+                b=[self.new_res],
+                expect_eq=False),
+            'b=int': TestCase(
+                a=self.init_res(),
+                b=1,
+                expect_eq=False),
+        }
+
+        for test_name, test_case in test_cases.items():
+            with self.subTest(test_name):
+                is_eq = test_case.a == test_case.b
+                self.assertEqual(test_case.expect_eq, is_eq)
 
 
 class TestFilterResults(unittest.TestCase):

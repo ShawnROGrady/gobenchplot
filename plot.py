@@ -16,6 +16,12 @@ class PlotData(typing.NamedTuple):
     def y_type(self):
         return self.y[0].dtype
 
+    def __eq__(self, other):
+        if not isinstance(other, PlotData):
+            return False
+
+        return np.array_equal(self.x, other.x) and np.array_equal(self.y, other.y)
+
 
 def bench_res_data(bench_results: typing.List[benchmark.SplitRes]) -> PlotData:
     order = len(bench_results)
