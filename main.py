@@ -45,6 +45,14 @@ def main() -> int:
         dest='filter_vars',
         nargs='+',
         help='the variables to filter results by (form: var_name=var_value)')
+    parser.add_argument(
+        '--%s' % (inputs.PLOTS_NAME),
+        dest='plots',
+        nargs='+',
+        help=(
+            'which plots to show (options: \'%s\')\n' % ('\', \''.join([plot.BAR_TYPE, plot.SCATTER_TYPE, plot.AVG_LINE_TYPE, plot.BEST_FIT_LINE_TYPE])) +
+            'if none provided will default to \'%s\' if x corresponds to a non numeric type, ' % (plot.BAR_TYPE) +
+            '[\'%s\'] otherwise' % ('\', \''.join([plot.SCATTER_TYPE, plot.AVG_LINE_TYPE]))))
 
     args = parser.parse_args()
 
@@ -66,7 +74,8 @@ def main() -> int:
         else:
             try:
                 plot.plot_bench(bench, args.group_by, args.x, y_name=args.y,
-                                subs=args.subs, filter_vars=args.filter_vars)
+                                subs=args.subs, filter_vars=args.filter_vars,
+                                plots=args.plots)
             except inputs.InvalidInputError as e:
                 print(str(e), file=sys.stderr)
                 return 1

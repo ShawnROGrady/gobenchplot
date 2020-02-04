@@ -3,6 +3,7 @@ Y_NAME = 'y'
 GROUP_BY_NAME = 'group-by'
 FILTER_BY_NAME = 'filter-by'
 SUBS_NAME = 'subs'
+PLOTS_NAME = 'plots'
 
 
 class InvalidInputError(Exception):
