@@ -36,6 +36,37 @@ sample_bench_results = (
     ),
 )
 
+sample_bench_results_no_mem = (
+    benchmark.BenchRes(
+        inputs=benchmark.BenchInputs(
+            subs=["first_bench"],
+            variables=[
+                benchmark.BenchVarValue(var_name='first_var',
+                                        var_value='some_name'),
+                benchmark.BenchVarValue(
+                    var_name='second_var', var_value=1),
+                benchmark.BenchVarValue(
+                    var_name='third_var', var_value=1.00),
+            ]),
+        outputs=benchmark.BenchOutputs(
+            runs=161651562, time=7.46, mem_used=None, mem_allocs=None),
+    ),
+    benchmark.BenchRes(
+        inputs=benchmark.BenchInputs(
+            subs=["first_bench"],
+            variables=[
+                benchmark.BenchVarValue(var_name='first_var',
+                                        var_value='some_name'),
+                benchmark.BenchVarValue(
+                    var_name='second_var', var_value=2),
+                benchmark.BenchVarValue(
+                    var_name='third_var', var_value=1.01),
+            ]),
+        outputs=benchmark.BenchOutputs(
+            runs=181651562, time=8.46, mem_used=None, mem_allocs=None),
+    ),
+)
+
 
 class TestBenchVarValue(unittest.TestCase):
     def test_eq(self):
@@ -321,6 +352,16 @@ class TestGroupedResults(unittest.TestCase):
                 },
                 x_name='first_var',
                 y_name='fake_output',
+                expected_err_type=inputs.InvalidInputError),
+            'y_name_corresponds_to_none': TestCase(
+                grouped_results={
+                    benchmark.BenchVarValues([
+                        benchmark.BenchVarValue(var_name='first_var',
+                                                var_value='some_name'),
+                    ]): list(sample_bench_results_no_mem),
+                },
+                x_name='first_var',
+                y_name='mem_allocs',
                 expected_err_type=inputs.InvalidInputError),
         }
         for test_name, test_case in test_cases.items():

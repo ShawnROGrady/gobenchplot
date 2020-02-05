@@ -154,6 +154,9 @@ class GroupedResults(dict):
 
                 try:
                     y_val = getattr(res.outputs, y_name)
+                    if y_val is None:
+                        raise inputs.InvalidInputError(
+                            'no output with that name', inputs.Y_NAME, input_val=y_name)
                     split_results[str(var_value)].append(
                         SplitRes(x=x_var.var_value, y=y_val))
                 except AttributeError:
