@@ -240,7 +240,11 @@ def plot_data(data: typing.Dict[str, PlotData], x_name: str, y_name: str = 'time
     plot_fn = build_plot_fn(data, x_name, y_name=y_name, plots=plots)
     # NOTE: for now assuming all plots can be shown on figure
     plt.xlabel(x_name)
-    plt.ylabel(y_name)
+    y_label = y_name
+    y_units = benchmark.bench_output_units(y_name)
+    if y_units != '':
+        y_label = '%s (%s)' % (y_name, y_units)
+    plt.ylabel(y_label)
     if isinstance(plot_fn, list):
         run_plot_fns(data, plot_fn)
     else:

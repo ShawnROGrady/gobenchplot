@@ -46,7 +46,20 @@ class BenchInputs(typing.NamedTuple):
 
 time_op_expr = re.compile(r'\s+([0-9\.]+) ns\/op')
 allocs_op_expr = re.compile(r'\s+([0-9]+) allocs\/op')
-used_op_expr = re.compile(r'\s+([0-9\.]+) ([A-Z]?)B\/op')
+used_op_expr = re.compile(r'\s+([0-9\.]+) B\/op')
+
+
+def bench_output_units(bench_out_name: str) -> str:
+    # the units of the output
+    if bench_out_name == 'runs':
+        return ''
+    if bench_out_name == 'time':
+        return 'ns/op'
+    if bench_out_name == 'mem_allocs':
+        return 'allocs/op'
+    if bench_out_name == 'mem_used':
+        return 'B/op'
+    return ''
 
 
 class BenchOutputs(typing.NamedTuple):

@@ -98,6 +98,34 @@ class TestBenchVarValues(unittest.TestCase):
                 self.assertEqual(test_case.expect_in, is_in)
 
 
+class TestBenchOutputs(unittest.TestCase):
+    def test_bench_output_units(self):
+        TestCase = collections.namedtuple(
+            'TestCase', 'out_name expected_units')
+        test_cases = [
+            TestCase(
+                out_name='runs',
+                expected_units=''),
+            TestCase(
+                out_name='time',
+                expected_units='ns/op'),
+            TestCase(
+                out_name='mem_allocs',
+                expected_units='allocs/op'),
+            TestCase(
+                out_name='mem_used',
+                expected_units='B/op'),
+            TestCase(
+                out_name='unknown_name',
+                expected_units=''),
+        ]
+        for test_case in test_cases:
+            with self.subTest(test_case.out_name):
+                units = benchmark.bench_output_units(test_case.out_name)
+                self.assertEqual(test_case.expected_units, units)
+        return
+
+
 class TestBenchmark(unittest.TestCase):
     def test_get_var_names(self):
         my_bench = benchmark.Benchmark("BenchmarkMyMethod")
