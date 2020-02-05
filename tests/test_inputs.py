@@ -26,3 +26,7 @@ class TestInvalidInputError(unittest.TestCase):
                     test_case.input_names,
                     test_case.input_val)
                 self.assertEqual(test_case.expected_str, str(err))
+
+
+if __name__ == '__main__':
+    unittest.main()

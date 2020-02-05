@@ -122,6 +122,71 @@ class TestBenchResData(unittest.TestCase):
                                  plot_data.y_type())
 
 
+class TestPlotBar(unittest.TestCase):
+    # test methods used to plot_bar
+    def test_get_bar_spacing_adjustment(self):
+        TestCase = namedtuple(
+            'TestCase', 'num_plots expected_adjs')
+        test_cases = {
+            '1_plot': TestCase(
+                num_plots=1,
+                expected_adjs=[0]),
+            '2_plots': TestCase(
+                num_plots=2,
+                expected_adjs=[-0.5, 0.5]),
+            '4_plots': TestCase(
+                num_plots=4,
+                expected_adjs=[-0.75, -0.25, 0.25, 0.75]),
+            '5_plots': TestCase(
+                num_plots=5,
+                expected_adjs=[-0.8, -0.4, 0, 0.4, 0.8]),
+        }
+        for test_name, test_case in test_cases.items():
+            with self.subTest(test_name):
+                adjs = [plot.get_bar_spacing_adjustment(
+                    i, test_case.num_plots) for i in range(test_case.num_plots)]
+                self.assertEqual(test_case.expected_adjs, adjs)
+        return
+
+    def test_get_bar_spacing_adjustment_no_plots(self):
+        self.assertEqual(0, plot.get_bar_spacing_adjustment(0, 0))
+        return
+
+    def test_get_bar_widths(self):
+        TestCase = namedtuple(
+            'TestCase', 'uniq_x num_plots expected_widths')
+
+        test_cases = {
+            'non_numeric_data': TestCase(
+                uniq_x=np.array(['foo', 'bar'], dtype=np.dtype('<U1')),
+                num_plots=2,
+                expected_widths=0.8),
+            'single_uniq_val': TestCase(
+                uniq_x=np.array([1]),
+                num_plots=2,
+                expected_widths=0.4),
+            '3_uniq_vals_2_plots_even_distribution': TestCase(
+                uniq_x=np.array([1, 2, 3]),
+                num_plots=2,
+                expected_widths=np.array([0.4, 0.4, 0.4])),
+            '5_uniq_vals_2_plots_uneven_distribution': TestCase(
+                uniq_x=np.array([2, 3, 5, 8, 13]),
+                num_plots=2,
+                expected_widths=np.array([0.4, (3-2)*0.4, (5-3)*0.4, (8-5)*0.4, (8-5)*0.4])),
+        }
+
+        for test_name, test_case in test_cases.items():
+            with self.subTest(test_name):
+                widths = plot.get_bar_widths(
+                    test_case.uniq_x, test_case.num_plots)
+                if isinstance(test_case.expected_widths, np.ndarray):
+                    self.assertTrue(np.array_equal(
+                        test_case.expected_widths, widths))
+                else:
+                    self.assertEqual(test_case.expected_widths, widths)
+        return
+
+
 class TestBuildPlotFn(unittest.TestCase):
     def test_build_plot_fn(self):
         TestCase = namedtuple(
@@ -137,7 +202,7 @@ class TestBuildPlotFn(unittest.TestCase):
                 y_name='time',
                 plots=None,
                 expected_plotfn_names=[plot.plot_scatter.__name__, plot.plot_avg_line.__name__]),
-            'numeric_x_1_plot_specified': TestCase(
+            'numeric_x_best_fit_plot_specified': TestCase(
                 data={
                     "first_var = some_name": plot.PlotData(
                         x=np.array([1, 2]),
@@ -147,6 +212,16 @@ class TestBuildPlotFn(unittest.TestCase):
                 y_name='time',
                 plots=plot.BEST_FIT_LINE_TYPE,
                 expected_plotfn_names=[plot.plot_best_fit_line.__name__]),
+            'numeric_x_avg_bar_plot_specified': TestCase(
+                data={
+                    "first_var = some_name": plot.PlotData(
+                        x=np.array([1, 2]),
+                        y=np.array([7.46, 8.46])),
+                },
+                x_name='first_var',
+                y_name='time',
+                plots=plot.BAR_TYPE,
+                expected_plotfn_names=[plot.plot_bar.__name__]),
             'non_numeric_x_no_plots_specified': TestCase(
                 data={
                     "first_var = some_name": plot.PlotData(
@@ -214,3 +289,7 @@ class TestBuildPlotFn(unittest.TestCase):
                         test_case.data,
                         test_case.x_name, y_name=test_case.y_name,
                         plots=test_case.plots)
+
+
+if __name__ == '__main__':
+    unittest.main()

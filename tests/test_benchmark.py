@@ -926,3 +926,7 @@ class TestBenchSuite(unittest.TestCase):
                     suite = benchmark.BenchSuite()
                     for line in test_case.input_lines:
                         suite.readline(line)
+
+
+if __name__ == '__main__':
+    unittest.main()
