@@ -44,7 +44,16 @@ def main() -> int:
         '--%s' % (inputs.FILTER_BY_NAME),
         dest='filter_vars',
         nargs='+',
-        help='the variables to filter results by (form: var_name=var_value)')
+        help=(
+            'the variables to filter results by (form: var_name==var_value)\n') +
+        'available comparisons: %s' % (', '.join([
+            str(benchmark.Comparison.EQ),
+            str(benchmark.Comparison.NE),
+            str(benchmark.Comparison.LT),
+            str(benchmark.Comparison.GT),
+            str(benchmark.Comparison.LE),
+            str(benchmark.Comparison.GE),
+        ]))),
     parser.add_argument(
         '--%s' % (inputs.PLOTS_NAME),
         dest='plots',

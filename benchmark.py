@@ -2,6 +2,7 @@ import typing
 import json
 from functools import singledispatch
 import re
+import enum
 import inputs
 
 
@@ -22,6 +23,69 @@ class BenchVarValue(typing.NamedTuple):
         if not isinstance(other, BenchVarValue):
             return False
         return self.var_name == other.var_name and self.var_value == other.var_value
+
+    def __lt__(self, other):
+        if not isinstance(other, BenchVarValue):
+            return False
+        return self.var_name == other.var_name and self.var_value < other.var_value
+
+    def __le__(self, other):
+        return self == other or self < other
+
+    def __gt__(self, other):
+        if not isinstance(other, BenchVarValue):
+            return False
+        return self.var_name == other.var_name and self.var_value > other.var_value
+
+    def __ge__(self, other):
+        return self == other or self > other
+
+
+EQ_VAL = "=="
+NE_VAL = "!="
+LT_VAL = "<"
+GT_VAL = ">"
+LE_VAL = "<="
+GE_VAL = ">="
+
+
+class Comparison(enum.Enum):
+    EQ = EQ_VAL
+    NE = NE_VAL
+    LT = LT_VAL
+    GT = GT_VAL
+    LE = LE_VAL
+    GE = GE_VAL
+
+    def __str__(self) -> str:
+        return self.value
+
+
+class BenchVarValComp(typing.NamedTuple):
+    var_val: BenchVarValue
+    comp: Comparison
+
+
+def parse_bench_var_val_cmp(in_str: str) -> BenchVarValComp:
+    cmps = {
+        EQ_VAL: Comparison.EQ,
+        NE_VAL: Comparison.NE,
+        LE_VAL: Comparison.LE,
+        GE_VAL: Comparison.GE,
+        LT_VAL: Comparison.LT,
+        GT_VAL: Comparison.GT,
+    }
+    trim_val = in_str.replace(" ", "")
+    for op, _cmp in cmps.items():
+        split_val = trim_val.split(op)
+        if len(split_val) != 2:
+            continue
+        var = BenchVarValue(
+            var_name=split_val[0], var_value=var_value(split_val[1]))
+        return BenchVarValComp(var_val=var, comp=_cmp)
+    raise inputs.InvalidInputError(
+        "not of expected form 'var_name==var_value'",
+        inputs.FILTER_BY_NAME, input_val=in_str)
 
 
 class BenchVarValues(typing.List[BenchVarValue]):
@@ -122,12 +186,12 @@ class GroupedResults(dict):
 
         return GroupedResults(initdata=filtered)
 
-    def filtered_by_var_value(self, value: BenchVarValue) -> 'GroupedResults':
+    def filtered_by_var_value(self, value: BenchVarValue, comp=Comparison.EQ) -> 'GroupedResults':
         filtered: typing.Dict[BenchVarValues, 'BenchResults'] = {}
         for k, v in self.items():
             filtered_results: BenchResults
             if isinstance(v, BenchResults):
-                filtered_results = v.filtered_by_var_value(value)
+                filtered_results = v.filtered_by_var_value(value, comp=comp)
             else:
                 filtered_results = BenchResults(v).filtered_by_var_value(value)
 
@@ -225,10 +289,31 @@ class BenchResults:
             filter(lambda x: x.inputs.subs == subs, self._data))
         return BenchResults(filtered_results)
 
-    def filtered_by_var_value(self, value: BenchVarValue) -> 'BenchResults':
+    def filtered_by_var_value(self, value: BenchVarValue, comp=Comparison.EQ) -> 'BenchResults':
         filtered_results: typing.List[BenchRes]
-        filtered_results = list(
-            filter(lambda x: value in x.inputs.variables, self._data))
+        if comp == Comparison.EQ:
+            filtered_results = list(
+                filter(lambda x: value in x.inputs.variables, self._data))
+        elif comp == Comparison.NE:
+            filtered_results = list(
+                filter(lambda x: value not in x.inputs.variables, self._data))
+        else:
+            if comp == Comparison.LT:
+                def x(x): return x < value
+            elif comp == Comparison.GT:
+                def x(x): return x > value
+            elif comp == Comparison.LE:
+                def x(x): return x <= value
+            elif comp == Comparison.GE:
+                def x(x): return x >= value
+            else:
+                raise Exception("unexpected comp: {}".format(comp))
+
+            filtered_results = []
+            for res in self._data:
+                for var in res.inputs.variables:
+                    if x(var):
+                        filtered_results.append(res)
         return BenchResults(filtered_results)
 
     def group_by(
@@ -299,6 +384,11 @@ def filter_by_var_value(filter_by: BenchVarValue, res: typing.Union[GroupedResul
     return res.filtered_by_var_value(filter_by)
 
 
+@filter_results.register(BenchVarValComp)
+def filter_by_var_val_cmp(filter_by: BenchVarValComp, res: typing.Union[GroupedResults, BenchResults]) -> typing.Union[GroupedResults, BenchResults]:
+    return res.filtered_by_var_value(filter_by.var_val, comp=filter_by.comp)
+
+
 @filter_results.register(list)
 def filter_by_subs(filter_by: typing.List[str], res: typing.Union[GroupedResults, BenchResults]) -> typing.Union[GroupedResults, BenchResults]:
     return res.filtered_by_subs(filter_by)
@@ -320,14 +410,8 @@ def build_filter_exprs(
 
     if var_values is not None and len(var_values) != 0:
         for value in var_values:
-            split_val = value.replace(" ", "").split("=")
-            if len(split_val) != 2:
-                raise inputs.InvalidInputError(
-                    "not of expected form 'var_name=var_value'",
-                    inputs.FILTER_BY_NAME, input_val=value)
-            var = BenchVarValue(
-                var_name=split_val[0], var_value=var_value(split_val[1]))
-            exprs.append(filter_expr(var))
+            var_cmp = parse_bench_var_val_cmp(value)
+            exprs.append(filter_expr(var_cmp))
     return exprs
 
 

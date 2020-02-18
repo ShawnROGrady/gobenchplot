@@ -662,8 +662,43 @@ class TestFilterResults(unittest.TestCase):
                     [self.group_res[0], self.group_res[1], self.group_res[2]])}),
                 filter_exprs=benchmark.build_filter_exprs(
                     ['first_bench'],
-                    ['second_var=2', 'first_var=some_name']),
+                    ['second_var==2', 'first_var==some_name']),
                 expected_filtered={self.group_vals: [self.group_res[1]]}),
+            'valid_filter_by_not_eq_var_value': self.TestCase(
+                initial_res=benchmark.GroupedResults(initdata={self.group_vals: benchmark.BenchResults(
+                    [self.group_res[0], self.group_res[1], self.group_res[2]])}),
+                filter_exprs=benchmark.build_filter_exprs(
+                    [],
+                    ['second_var!=2']),
+                expected_filtered={self.group_vals: [self.group_res[0]]}),
+            'valid_filter_by_lt_var_value': self.TestCase(
+                initial_res=benchmark.GroupedResults(initdata={self.group_vals: benchmark.BenchResults(
+                    [self.group_res[0], self.group_res[1], self.group_res[2]])}),
+                filter_exprs=benchmark.build_filter_exprs(
+                    [],
+                    ['second_var<2']),
+                expected_filtered={self.group_vals: [self.group_res[0]]}),
+            'valid_filter_by_gt_var_value': self.TestCase(
+                initial_res=benchmark.GroupedResults(initdata={self.group_vals: benchmark.BenchResults(
+                    [self.group_res[0], self.group_res[1], self.group_res[2]])}),
+                filter_exprs=benchmark.build_filter_exprs(
+                    [],
+                    ['third_var>1']),
+                expected_filtered={self.group_vals: [self.group_res[1], self.group_res[2]]}),
+            'valid_filter_by_le_var_value': self.TestCase(
+                initial_res=benchmark.GroupedResults(initdata={self.group_vals: benchmark.BenchResults(
+                    [self.group_res[0], self.group_res[1], self.group_res[2]])}),
+                filter_exprs=benchmark.build_filter_exprs(
+                    [],
+                    ['third_var<=1.01']),
+                expected_filtered={self.group_vals: [self.group_res[0], self.group_res[1]]}),
+            'valid_filter_by_ge_var_value': self.TestCase(
+                initial_res=benchmark.GroupedResults(initdata={self.group_vals: benchmark.BenchResults(
+                    [self.group_res[0], self.group_res[1], self.group_res[2]])}),
+                filter_exprs=benchmark.build_filter_exprs(
+                    [],
+                    ['third_var>=1.01']),
+                expected_filtered={self.group_vals: [self.group_res[1], self.group_res[2]]}),
             'valid_filter_by_subs': self.TestCase(
                 initial_res=benchmark.GroupedResults(initdata={self.group_vals: benchmark.BenchResults(
                     [self.group_res[0], self.group_res[1], self.group_res[2]])}),
@@ -758,7 +793,7 @@ class TestFilterResults(unittest.TestCase):
                     [self.group_res[0], self.group_res[1], self.group_res[2]]),
                 filter_exprs=benchmark.build_filter_exprs(
                     ['first_bench'],
-                    ['second_var=2', 'first_var=some_name']),
+                    ['second_var==2', 'first_var==some_name']),
                 expected_filtered=[self.group_res[1]]),
             'valid_filter_by_subs': self.TestCase(
                 initial_res=benchmark.BenchResults(
