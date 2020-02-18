@@ -65,14 +65,12 @@ def main() -> int:
 
     args = parser.parse_args()
 
-    suite = benchmark.BenchSuite()
+    suite: benchmark.BenchSuite
     if args.file is None or args.file == "" or args.file == "-":
-        for line in sys.stdin:
-            suite.readline(line)
+        suite = benchmark.parse_bench_output(sys.stdin)
     else:
         with open(args.file) as f:
-            for line in f:
-                suite.readline(line)
+            suite = benchmark.parse_bench_output(f)
 
     if args.bench is not None:
         bench = suite.get_benchmark(args.bench)

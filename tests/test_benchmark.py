@@ -1,3 +1,4 @@
+import io
 import copy
 import benchmark
 import inputs
@@ -996,15 +997,20 @@ class TestBenchSuite(unittest.TestCase):
 
         bench_name = "BenchmarkMyMethod"
 
-        suite = benchmark.BenchSuite()
+        f = io.StringIO()
         for line in input_lines:
-            suite.readline(line)
+            f.write(line + '\n')
+        f.seek(0)
+        suite = benchmark.parse_bench_output(f)
+        f.close()
 
         bench = suite.get_benchmark(bench_name)
         self.assertIsNotNone(bench)
 
-        benches = suite.get_benchmarks()
-        self.assertEqual(1, len(benches))
+        self.assertEqual(1, len(suite.benchmarks))
+
+        bench2 = suite.get_benchmark("InvalidBenchmarkName")
+        self.assertIsNone(bench2)
 
     def test_readline_raises(self):
         TestCase = collections.namedtuple(
@@ -1027,9 +1033,13 @@ class TestBenchSuite(unittest.TestCase):
         for test_name, test_case in test_cases.items():
             with self.subTest(test_name):
                 with self.assertRaises(test_case.expected_err_type):
-                    suite = benchmark.BenchSuite()
+                    f = io.StringIO()
                     for line in test_case.input_lines:
-                        suite.readline(line)
+                        f.write(line + '\n')
+                    f.seek(0)
+                    suite = benchmark.parse_bench_output(f)
+                    f.close()
+        return
 
 
 if __name__ == '__main__':

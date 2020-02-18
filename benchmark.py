@@ -516,43 +516,47 @@ def parse_out_line(line: str) -> typing.Optional[
     return None
 
 
-class BenchSuite:
-    def __init__(self):
-        self._benchmarks: typing.List[Benchmark] = []
-        self._current_bench: typing.Optional[BenchInfo] = None
-
-    def readline(self, line: str):
-        res = parse_out_line(line)
-        if res is None:
-            return
-        if isinstance(res, BenchInfo):
-            self._current_bench = res
-            return
-        if isinstance(res, BenchOutputs):
-            if self._current_bench is None:
-                raise ParseBenchmarkError(
-                    line,
-                    "bench outputs provided before bench info")
-
-            existing_bench = self.get_benchmark(self._current_bench.name)
-            if existing_bench:
-                existing_bench.add_result(BenchRes(
-                    inputs=self._current_bench.inputs,
-                    outputs=res))
-            else:
-                new_bench = Benchmark(self._current_bench.name)
-                new_bench.add_result(BenchRes(
-                    inputs=self._current_bench.inputs,
-                    outputs=res))
-                self._benchmarks.append(new_bench)
-            self._current_bench = None
+class BenchSuite(typing.NamedTuple):
+    benchmarks: typing.List[Benchmark]
 
     def get_benchmark(self, name) -> typing.Optional[Benchmark]:
-        for bench in self._benchmarks:
+        for bench in self.benchmarks:
             if bench.name == name:
                 return bench
 
         return None
 
-    def get_benchmarks(self) -> typing.List[Benchmark]:
-        return self._benchmarks
+
+def parse_bench_output(f) -> BenchSuite:
+    benchmarks: typing.List[Benchmark] = []
+    current_bench: typing.Optional[BenchInfo] = None
+    for line in f:
+        res = parse_out_line(line)
+        if res is None:
+            continue
+        if isinstance(res, BenchInfo):
+            current_bench = res
+            continue
+        if isinstance(res, BenchOutputs):
+            if current_bench is None:
+                raise ParseBenchmarkError(
+                    line,
+                    "bench outputs provided before bench info")
+
+            existing_bench: typing.Optional[Benchmark] = None
+            for bench in benchmarks:
+                if bench.name == current_bench.name:
+                    existing_bench = bench
+            if existing_bench:
+                existing_bench.add_result(BenchRes(
+                    inputs=current_bench.inputs,
+                    outputs=res))
+            else:
+                new_bench = Benchmark(current_bench.name)
+                new_bench.add_result(BenchRes(
+                    inputs=current_bench.inputs,
+                    outputs=res))
+                benchmarks.append(new_bench)
+            current_bench = None
+
+    return BenchSuite(benchmarks=benchmarks)
