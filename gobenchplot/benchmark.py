@@ -22,12 +22,16 @@ class BenchVarValue(typing.NamedTuple):
     def __eq__(self, other):
         if not isinstance(other, BenchVarValue):
             return False
-        return self.var_name == other.var_name and self.var_value == other.var_value
+        return (
+            self.var_name == other.var_name and
+            self.var_value == other.var_value)
 
     def __lt__(self, other):
         if not isinstance(other, BenchVarValue):
             return False
-        return self.var_name == other.var_name and self.var_value < other.var_value
+        return (
+            self.var_name == other.var_name and
+            self.var_value < other.var_value)
 
     def __le__(self, other):
         return self == other or self < other
@@ -35,7 +39,9 @@ class BenchVarValue(typing.NamedTuple):
     def __gt__(self, other):
         if not isinstance(other, BenchVarValue):
             return False
-        return self.var_name == other.var_name and self.var_value > other.var_value
+        return (
+            self.var_name == other.var_name and
+            self.var_value > other.var_value)
 
     def __ge__(self, other):
         return self == other or self > other
@@ -49,6 +55,30 @@ LE_VAL = "<="
 GE_VAL = ">="
 
 
+def _eq_fn(x, y) -> bool:
+    return x == y
+
+
+def _ne_fn(x, y) -> bool:
+    return x == y
+
+
+def _lt_fn(x, y) -> bool:
+    return x < y
+
+
+def _gt_fn(x, y) -> bool:
+    return x > y
+
+
+def _le_fn(x, y) -> bool:
+    return x <= y
+
+
+def _ge_fn(x, y) -> bool:
+    return x >= y
+
+
 class Comparison(enum.Enum):
     EQ = EQ_VAL
     NE = NE_VAL
@@ -59,6 +89,21 @@ class Comparison(enum.Enum):
 
     def __str__(self) -> str:
         return self.value
+
+    def get_fn(self) -> typing.Callable[[typing.Any, typing.Any], bool]:
+        if self == Comparison.EQ:
+            return _eq_fn
+        if self == Comparison.EQ:
+            return _ne_fn
+        if self == Comparison.LT:
+            return _lt_fn
+        if self == Comparison.GT:
+            return _gt_fn
+        if self == Comparison.LE:
+            return _le_fn
+        if self == Comparison.GE:
+            return _ge_fn
+        raise Exception("unexpected comp: {}".format(self))
 
 
 class BenchVarValComp(typing.NamedTuple):
@@ -153,7 +198,9 @@ SplitResults = typing.Dict[str, typing.List[SplitRes]]
 
 
 class GroupedResults(dict):
-    def __init__(self, initdata: typing.Dict[BenchVarValues, 'BenchResults'] = None):
+    def __init__(
+            self,
+            initdata: typing.Dict[BenchVarValues, 'BenchResults'] = None):
         if initdata is None:
             dict.__init__(self, {})
         else:
@@ -186,7 +233,9 @@ class GroupedResults(dict):
 
         return GroupedResults(initdata=filtered)
 
-    def filtered_by_var_value(self, value: BenchVarValue, comp=Comparison.EQ) -> 'GroupedResults':
+    def filtered_by_var_value(
+            self,
+            value: BenchVarValue, comp=Comparison.EQ) -> 'GroupedResults':
         filtered: typing.Dict[BenchVarValues, 'BenchResults'] = {}
         for k, v in self.items():
             filtered_results: BenchResults
@@ -212,7 +261,8 @@ class GroupedResults(dict):
 
                 if x_var is None:
                     raise inputs.InvalidInputError(
-                        'no variable with that name', inputs.X_NAME, input_val=x_name)
+                        'no variable with that name',
+                        inputs.X_NAME, input_val=x_name)
                 if not str(var_value) in split_results:
                     split_results[str(var_value)] = []
 
@@ -220,12 +270,14 @@ class GroupedResults(dict):
                     y_val = getattr(res.outputs, y_name)
                     if y_val is None:
                         raise inputs.InvalidInputError(
-                            'no output with that name', inputs.Y_NAME, input_val=y_name)
+                            'no output with that name',
+                            inputs.Y_NAME, input_val=y_name)
                     split_results[str(var_value)].append(
                         SplitRes(x=x_var.var_value, y=y_val))
                 except AttributeError:
                     raise inputs.InvalidInputError(
-                        'no output with that name', inputs.Y_NAME, input_val=y_name)
+                        'no output with that name',
+                        inputs.Y_NAME, input_val=y_name)
         return split_results
 
 
@@ -266,7 +318,7 @@ class BenchResults:
         for res in self._data:
             v_names = res.get_var_names()
             for v_name in v_names:
-                if not v_name in all_v_names:
+                if v_name not in all_v_names:
                     all_v_names.append(v_name)
         return all_v_names
 
@@ -279,7 +331,7 @@ class BenchResults:
             for sub in subs:
                 if all_subs is None:
                     all_subs = []
-                if not sub in all_subs:
+                if sub not in all_subs:
                     all_subs.append(sub)
         return all_subs
 
@@ -289,7 +341,10 @@ class BenchResults:
             filter(lambda x: x.inputs.subs == subs, self._data))
         return BenchResults(filtered_results)
 
-    def filtered_by_var_value(self, value: BenchVarValue, comp=Comparison.EQ) -> 'BenchResults':
+    def filtered_by_var_value(
+            self,
+            value: BenchVarValue,
+            comp=Comparison.EQ) -> 'BenchResults':
         filtered_results: typing.List[BenchRes]
         if comp == Comparison.EQ:
             filtered_results = list(
@@ -298,21 +353,11 @@ class BenchResults:
             filtered_results = list(
                 filter(lambda x: value not in x.inputs.variables, self._data))
         else:
-            if comp == Comparison.LT:
-                def x(x): return x < value
-            elif comp == Comparison.GT:
-                def x(x): return x > value
-            elif comp == Comparison.LE:
-                def x(x): return x <= value
-            elif comp == Comparison.GE:
-                def x(x): return x >= value
-            else:
-                raise Exception("unexpected comp: {}".format(comp))
-
+            fn = comp.get_fn()
             filtered_results = []
             for res in self._data:
                 for var in res.inputs.variables:
-                    if x(var):
+                    if fn(var, value):
                         filtered_results.append(res)
         return BenchResults(filtered_results)
 
@@ -326,16 +371,19 @@ class BenchResults:
         # TODO: validate subs
         if isinstance(group_by, typing.List):
             for group_var_name in group_by:
-                if not group_var_name in all_var_names:
+                if group_var_name not in all_var_names:
                     raise inputs.InvalidInputError(
-                        'no variable with that name', inputs.GROUP_BY_NAME, input_val=group_var_name)
+                        'no variable with that name',
+                        inputs.GROUP_BY_NAME, input_val=group_var_name)
         elif isinstance(group_by, str):
-            if not group_by in all_var_names:
+            if group_by not in all_var_names:
                 raise inputs.InvalidInputError(
-                    'no variable with that name', inputs.GROUP_BY_NAME, input_val=group_by)
+                    'no variable with that name',
+                    inputs.GROUP_BY_NAME, input_val=group_by)
         else:
             raise inputs.InvalidInputError(
-                'invalid type %s' % (type(group_by)), inputs.GROUP_BY_NAME, input_val=group_by)
+                'invalid type %s' % (type(group_by)),
+                inputs.GROUP_BY_NAME, input_val=group_by)
 
         grouped_results: GroupedResults = GroupedResults()
 
@@ -343,11 +391,15 @@ class BenchResults:
             group_vals: BenchVarValues
             if isinstance(group_by, typing.List):
                 group_vals = BenchVarValues(list(
-                    filter(lambda x: x.var_name in group_by, res.inputs.variables)))
+                    filter(
+                        lambda x: x.var_name in group_by,
+                        res.inputs.variables)))
             else:
                 group_vals = BenchVarValues(list(
-                    filter(lambda x: x.var_name == group_by, res.inputs.variables)))
-            if not group_vals in grouped_results:
+                    filter(
+                        lambda x: x.var_name == group_by,
+                        res.inputs.variables)))
+            if group_vals not in grouped_results:
                 grouped_results[group_vals] = BenchResults([res])
             else:
                 grouped_results[group_vals].append(res)
@@ -374,23 +426,26 @@ class Benchmark:
         return self._results
 
 
+Results = typing.Union[GroupedResults, BenchResults]
+
+
 @singledispatch
-def filter_results(filter_by, res: typing.Union[GroupedResults, BenchResults]) -> typing.Union[GroupedResults, BenchResults]:
+def filter_results(filter_by, res: Results) -> Results:
     return res
 
 
 @filter_results.register(BenchVarValue)
-def filter_by_var_value(filter_by: BenchVarValue, res: typing.Union[GroupedResults, BenchResults]) -> typing.Union[GroupedResults, BenchResults]:
+def filter_by_var_value(filter_by: BenchVarValue, res: Results) -> Results:
     return res.filtered_by_var_value(filter_by)
 
 
 @filter_results.register(BenchVarValComp)
-def filter_by_var_val_cmp(filter_by: BenchVarValComp, res: typing.Union[GroupedResults, BenchResults]) -> typing.Union[GroupedResults, BenchResults]:
+def filter_by_var_val_cmp(filter_by: BenchVarValComp, res: Results) -> Results:
     return res.filtered_by_var_value(filter_by.var_val, comp=filter_by.comp)
 
 
 @filter_results.register(list)
-def filter_by_subs(filter_by: typing.List[str], res: typing.Union[GroupedResults, BenchResults]) -> typing.Union[GroupedResults, BenchResults]:
+def filter_by_subs(filter_by: typing.List[str], res: Results) -> Results:
     return res.filtered_by_subs(filter_by)
 
 
@@ -457,63 +512,73 @@ def parse_out_line(line: str) -> typing.Optional[
     output_info = bench_line["Output"]
     if output_info.startswith("Benchmark"):
         # BenchInfo
-        m = bench_info_expr.match(output_info)
-        if not m:
-            raise ParseBenchmarkError(
-                line, "line didn't match regular expression %s" % (bench_info_expr))
-
-        full_name = m[1]
-        name: str = ''
-        subs: typing.Optional[typing.List[str]] = None
-        variables: typing.List[BenchVarValue] = []
-
-        for i, value in enumerate(full_name.split('/')):
-            if i == 0:
-                name = value
-                continue
-            split_val = value.split("=")
-            if len(split_val) != 2:
-                if subs is None:
-                    subs = [value]
-                else:
-                    subs.append(value)
-            else:
-                variables.append(
-                    BenchVarValue(var_name=split_val[0], var_value=var_value(split_val[1])))
-        return BenchInfo(
-            name=name,
-            inputs=BenchInputs(variables=variables, subs=subs))
+        return parse_bench_info_line(line, output_info)
     elif output_info.lstrip()[0].isdigit():
         # BenchOutputs
-        vals = output_info.split('\t')
-        runs: int = int(vals[0])
-        time: typing.Optional[float] = None
-        mem_allocs: typing.Optional[int] = None
-        mem_used: typing.Optional[float] = None
-
-        for i, value in enumerate(vals, start=0):
-            if i == 0:
-                continue
-            if time is None:
-                m = time_op_expr.match(value)
-                if m:
-                    time = float(m[1])
-            elif mem_used is None:
-                m = used_op_expr.match(value)
-                if m:
-                    mem_used = float(m[1])
-            elif mem_allocs is None:
-                m = allocs_op_expr.match(value)
-                if m:
-                    mem_allocs = int(m[1])
-        if time is not None:
-            return BenchOutputs(
-                runs=runs, time=time, mem_allocs=mem_allocs, mem_used=mem_used)
-        else:
-            raise ParseBenchmarkError(
-                line, "no time found in benchmark output")
-
+        return parse_bench_outputs_line(line, output_info)
     return None
+
+
+def parse_bench_info_line(line: str, output_info) -> BenchInfo:
+    m = bench_info_expr.match(output_info)
+    if not m:
+        raise ParseBenchmarkError(
+            line,
+            "line didn't match regular expression %s" % (bench_info_expr))
+
+    full_name = m[1]
+    name: str = ''
+    subs: typing.Optional[typing.List[str]] = None
+    variables: typing.List[BenchVarValue] = []
+
+    for i, value in enumerate(full_name.split('/')):
+        if i == 0:
+            name = value
+            continue
+        split_val = value.split("=")
+        if len(split_val) != 2:
+            if subs is None:
+                subs = [value]
+            else:
+                subs.append(value)
+        else:
+            variables.append(
+                BenchVarValue(
+                    var_name=split_val[0],
+                    var_value=var_value(split_val[1])))
+    return BenchInfo(
+        name=name,
+        inputs=BenchInputs(variables=variables, subs=subs))
+
+
+def parse_bench_outputs_line(line: str, output_info) -> BenchOutputs:
+    vals = output_info.split('\t')
+    runs: int = int(vals[0])
+    time: typing.Optional[float] = None
+    mem_allocs: typing.Optional[int] = None
+    mem_used: typing.Optional[float] = None
+
+    for i, value in enumerate(vals, start=0):
+        if i == 0:
+            continue
+        if time is None:
+            m = time_op_expr.match(value)
+            if m:
+                time = float(m[1])
+        elif mem_used is None:
+            m = used_op_expr.match(value)
+            if m:
+                mem_used = float(m[1])
+        elif mem_allocs is None:
+            m = allocs_op_expr.match(value)
+            if m:
+                mem_allocs = int(m[1])
+    if time is not None:
+        return BenchOutputs(
+            runs=runs, time=time, mem_allocs=mem_allocs, mem_used=mem_used)
+    else:
+        raise ParseBenchmarkError(
+            line, "no time found in benchmark output")
 
 
 class BenchSuite(typing.NamedTuple):

@@ -1,6 +1,5 @@
 import sys
 import argparse
-import typing
 import gobenchplot.plot as plot
 import gobenchplot.benchmark as benchmark
 import gobenchplot.inputs as inputs
@@ -12,7 +11,9 @@ def main() -> int:
     parser.add_argument(
         'file',
         nargs='?',
-        help="file containing bench results (if empty or '-' stdin is assumed)")
+        help=(
+            "file containing bench results\n" +
+            "if empty or '-' stdin is assumed"))
     parser.add_argument(
         '--bench',
         dest='bench',
@@ -29,7 +30,9 @@ def main() -> int:
         dest='y',
         nargs='?',
         default='time',
-        help="the name of the y-axis variable (one of: %s)" % (', '.join(available_y_vals)))
+        help=(
+            "the name of the y-axis variable. " +
+            "One of: %s" % (', '.join(available_y_vals))))
     parser.add_argument(
         '--%s' % (inputs.GROUP_BY_NAME),
         dest='group_by',
@@ -45,23 +48,32 @@ def main() -> int:
         dest='filter_vars',
         nargs='+',
         help=(
-            'the variables to filter results by (form: var_name==var_value)\n') +
-        'available comparisons: %s' % (', '.join([
-            str(benchmark.Comparison.EQ),
-            str(benchmark.Comparison.NE),
-            str(benchmark.Comparison.LT),
-            str(benchmark.Comparison.GT),
-            str(benchmark.Comparison.LE),
-            str(benchmark.Comparison.GE),
-        ]))),
+            'the variables to filter results by. ' +
+            'Form: \'var_name==var_value\'. ' +
+            'Available comparisons: %s' % (', '.join([
+                str(benchmark.Comparison.EQ),
+                str(benchmark.Comparison.NE),
+                str(benchmark.Comparison.LT),
+                str(benchmark.Comparison.GT),
+                str(benchmark.Comparison.LE),
+                str(benchmark.Comparison.GE),
+            ])))),
     parser.add_argument(
         '--%s' % (inputs.PLOTS_NAME),
         dest='plots',
         nargs='+',
         help=(
-            'which plots to show (options: \'%s\')\n' % ('\', \''.join([plot.BAR_TYPE, plot.SCATTER_TYPE, plot.AVG_LINE_TYPE, plot.BEST_FIT_LINE_TYPE])) +
-            'if none provided will default to \'%s\' if x corresponds to a non numeric type, ' % (plot.BAR_TYPE) +
-            '[\'%s\'] otherwise' % ('\', \''.join([plot.SCATTER_TYPE, plot.AVG_LINE_TYPE]))))
+            'which plots to show (options: \'%s\'). ' % ('\', \''.join([
+                plot.BAR_TYPE,
+                plot.SCATTER_TYPE,
+                plot.AVG_LINE_TYPE,
+                plot.BEST_FIT_LINE_TYPE])) +
+            'Defaults to \'%s\' if x corresponds to a non numeric type, ' % (
+                plot.BAR_TYPE) +
+            '[\'%s\'] otherwise' % ('\', \''.join([
+                plot.SCATTER_TYPE,
+                plot.AVG_LINE_TYPE,
+            ]))))
 
     args = parser.parse_args()
 

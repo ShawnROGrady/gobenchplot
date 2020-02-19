@@ -26,7 +26,9 @@ class PlotData(typing.NamedTuple):
         if not isinstance(other, PlotData):
             return False
 
-        return np.array_equal(self.x, other.x) and np.array_equal(self.y, other.y)
+        return (
+            np.array_equal(self.x, other.x) and
+            np.array_equal(self.y, other.y))
 
     def avg_over_x(self) -> 'PlotData':
         uniq_x = np.unique(self.x)
@@ -34,7 +36,9 @@ class PlotData(typing.NamedTuple):
         for i, uniq_x_val in enumerate(uniq_x):
             indices = list(
                 filter(lambda x: x is not None,
-                       map(lambda x:  x[0] if x[1] == uniq_x_val else None,  enumerate(self.x))))
+                       map(
+                           lambda x:  x[0] if x[1] == uniq_x_val else None,
+                           enumerate(self.x))))
 
             y_vals = np.empty(len(indices), dtype=self.y_type())
             for j, index in enumerate(indices):
@@ -88,16 +92,21 @@ def plot_best_fit_line(data: typing.Dict[str, PlotData], include_label):
                 best_fit_fn(uniq_x))
 
 
-def get_bar_spacing_adjustment(plotnum: int, num_plots: int) -> typing.Union[int, float]:
+def get_bar_spacing_adjustment(
+        plotnum: int,
+        num_plots: int) -> typing.Union[int, float]:
     if num_plots == 0:
         return 0
     # produce even spacing without colliding with others
     return (1/num_plots) * (2*plotnum - (num_plots-1))
 
 
-def get_bar_widths(uniq_x: np.ndarray, num_plots: int)->typing.Union[float, np.ndarray]:
+def get_bar_widths(
+        uniq_x: np.ndarray,
+        num_plots: int) -> typing.Union[float, np.ndarray]:
     if non_numeric_dtype(uniq_x[0].dtype):
-        # for non numeric plots we can control the spacing so just use default width
+        # for non numeric plots we can control the spacing
+        # just use default width
         return 0.8
 
     # NOTE: this is assuming each of the num_plots has the same uniq_x
@@ -130,7 +139,8 @@ def plot_bar(data: typing.Dict[str, PlotData], include_label):
             y_means[i] = np.mean(plot_data.y)
 
         if include_label:
-            # TODO come up with an actual label, just doing this to prevent legend() error
+            # TODO come up with an actual label
+            # just doing this to prevent legend() error
             plt.bar(x, y_means, label='')
         else:
             plt.bar(x, y_means)
@@ -154,7 +164,10 @@ def plot_bar(data: typing.Dict[str, PlotData], include_label):
             ax.set_xticklabels(uniq_x)
 
 
-def plot_fn_from_type(plots: typing.Optional[typing.Union[typing.List[str], str]]):
+SpecifiedPlots = typing.Optional[typing.Union[typing.List[str], str]]
+
+
+def plot_fn_from_type(plots: SpecifiedPlots):
     if plots is None:
         return None
 
@@ -179,7 +192,10 @@ def plot_fn_from_type(plots: typing.Optional[typing.Union[typing.List[str], str]
 
 
 def non_numeric_dtype(dtype) -> bool:
-    if ('str' in dtype.name) or ('bool' in dtype.name) or ('bytes' in dtype.name):
+    if (
+            ('str' in dtype.name) or
+            ('bool' in dtype.name) or
+            ('bytes' in dtype.name)):
         return True
     return False
 
@@ -200,7 +216,9 @@ def build_plot_fn(
     if non_numeric_dtype(x_type):
         if plots is None or plots == BAR_TYPE:
             return plot_fn_from_type(BAR_TYPE)
-        elif (isinstance(plots, str) and plots == BAR_TYPE) or (isinstance(plots, list) and BAR_TYPE in plots):
+        elif (
+                (isinstance(plots, str) and plots == BAR_TYPE)
+                or (isinstance(plots, list) and BAR_TYPE in plots)):
             return plot_fn_from_type(plots)
         else:
             raise inputs.InvalidInputError(
@@ -237,7 +255,11 @@ def run_plot_fns(data: typing.Dict[str, PlotData], plot_fns):
             fn(data, include_label=False)
 
 
-def plot_data(data: typing.Dict[str, PlotData], x_name: str, y_name: str = 'time', plots=None):
+def plot_data(
+        data: typing.Dict[str, PlotData],
+        x_name: str,
+        y_name: str = 'time',
+        plots=None):
     plot_fn = build_plot_fn(data, x_name, y_name=y_name, plots=plots)
     # NOTE: for now assuming all plots can be shown on figure
     plt.xlabel(x_name)
