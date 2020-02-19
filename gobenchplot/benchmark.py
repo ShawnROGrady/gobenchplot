@@ -3,7 +3,7 @@ import json
 from functools import singledispatch
 import re
 import enum
-import inputs
+import gobenchplot.inputs as inputs
 
 
 ResValue = typing.Union[int, str, float, bool]

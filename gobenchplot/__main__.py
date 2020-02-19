@@ -1,9 +1,9 @@
 import sys
 import argparse
 import typing
-import plot
-import benchmark
-import inputs
+import gobenchplot.plot as plot
+import gobenchplot.benchmark as benchmark
+import gobenchplot.inputs as inputs
 
 
 def main() -> int:

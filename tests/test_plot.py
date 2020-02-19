@@ -1,8 +1,8 @@
 import unittest
 import numpy as np
-import benchmark
-import inputs
-import plot
+import gobenchplot.plot as plot
+import gobenchplot.benchmark as benchmark
+import gobenchplot.inputs as inputs
 from collections import namedtuple
 
 

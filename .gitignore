@@ -9,3 +9,6 @@
 # ignore code coverage stuff
 htmlcov/
 .coverage
+
+# ignore install stuff
+*.egg-info/

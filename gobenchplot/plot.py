@@ -2,8 +2,9 @@ import copy
 import matplotlib.pyplot as plt
 import numpy as np
 import typing
-import benchmark
-import inputs
+import gobenchplot.benchmark as benchmark
+import gobenchplot.inputs as inputs
+
 
 BAR_TYPE = 'bar'
 SCATTER_TYPE = 'scatter'

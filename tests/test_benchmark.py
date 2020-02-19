@@ -1,7 +1,7 @@
 import io
 import copy
-import benchmark
-import inputs
+import gobenchplot.benchmark as benchmark
+import gobenchplot.inputs as inputs
 import functools
 import unittest
 import collections
