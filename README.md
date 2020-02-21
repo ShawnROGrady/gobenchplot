@@ -19,3 +19,6 @@ Focusing on just the portion of interest:
 gobenchplot --bench='BenchmarkDedupe' --x='num_elems' --group-by='finder' --filter-by='num_elems<=10' tmp.txt
 ```
 ![focused_bench_dedupe](https://github.com/ShawnROGrady/mapslicecomp/blob/master/assets/focused_benchmark_dedupe_time-v-num_elems.png)
+
+## Next Steps
+I plan on eventually re-implementing this in go. Python and `matplotlib` have been my default tools for generating plots but after some preliminary research it looks like there are plenty of tools in the go ecosystem that would be a suitable replacement for this use case.
