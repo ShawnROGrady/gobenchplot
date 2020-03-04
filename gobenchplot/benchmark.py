@@ -93,7 +93,7 @@ class Comparison(enum.Enum):
     def get_fn(self) -> typing.Callable[[typing.Any, typing.Any], bool]:
         if self == Comparison.EQ:
             return _eq_fn
-        if self == Comparison.EQ:
+        if self == Comparison.NE:
             return _ne_fn
         if self == Comparison.LT:
             return _lt_fn
